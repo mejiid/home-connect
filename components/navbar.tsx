@@ -27,7 +27,6 @@ const Navbar = () => {
   const [scrolled, setScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [userRole, setUserRole] = useState("");
-  const [isFetchingRole, setIsFetchingRole] = useState(false);
   const pathname = usePathname();
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -35,17 +34,17 @@ const Navbar = () => {
   const { data: session, isPending } = authClient.useSession();
 
   useEffect(() => {
-    if (!session?.user) {
-      setUserRole("");
-      setIsFetchingRole(false);
-      return;
-    }
-
     let isMounted = true;
     const controller = new AbortController();
-    setIsFetchingRole(true);
 
     const fetchRole = async () => {
+      if (!session?.user) {
+        if (isMounted) {
+          setUserRole("");
+        }
+        return;
+      }
+
       try {
         const response = await fetch("/api/user/role", {
           method: "GET",
@@ -82,10 +81,6 @@ const Navbar = () => {
           console.error("Failed to fetch user role:", error);
           setUserRole("");
         }
-      } finally {
-        if (isMounted) {
-          setIsFetchingRole(false);
-        }
       }
     };
 
@@ -95,7 +90,7 @@ const Navbar = () => {
       isMounted = false;
       controller.abort();
     };
-  }, [session?.user?.id]);
+  }, [session?.user]);
 
   const roleSpecificLinks = (() => {
     const roleLinks: {

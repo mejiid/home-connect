@@ -1,13 +1,16 @@
 import React from "react";
+import Image from "next/image";
 
 const Hero: React.FC = () => {
   return (
     <section className="relative h-[80vh] min-h-[500px] flex items-center justify-center text-white">
       <div className="absolute inset-0 bg-black opacity-50 z-10"></div>
-      <img
+      <Image
         src="https://picsum.photos/1600/900?random=1"
         alt="A vibrant, narrow alleyway in the old city of Harar, Ethiopia"
         className="absolute inset-0 w-full h-full object-cover"
+        fill
+        priority
       />
       <div className="relative z-20 container mx-auto px-6 text-center">
         <h1 className="text-4xl md:text-6xl font-bold font-sora leading-tight mb-4 animate-fade-in-up text-white">

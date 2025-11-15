@@ -177,11 +177,11 @@ export default function SignUpPage() {
       setOtpExpiresAt(data.expiresAt ?? null);
       setResendCooldown(RESEND_SECONDS);
       setIsLoading(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("OTP request error:", error);
       setErrors((prev) => ({
         ...prev,
-        email: error?.message || "Failed to send verification code",
+        email: error instanceof Error ? error.message : "Failed to send verification code",
       }));
       setIsLoading(false);
     }
@@ -241,10 +241,10 @@ export default function SignUpPage() {
       }
 
       window.location.href = "/";
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("OTP verification error:", error);
       setOtpError(
-        error?.message || "Failed to verify the code. Please try again."
+        error instanceof Error ? error.message : "Failed to verify the code. Please try again."
       );
       setIsVerifyingOtp(false);
     }
@@ -282,7 +282,7 @@ export default function SignUpPage() {
       );
       setOtpExpiresAt(data.expiresAt ?? null);
       setResendCooldown(RESEND_SECONDS);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Resend OTP error:", error);
       setOtpError("Failed to resend the code. Please try again later.");
     } finally {
