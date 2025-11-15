@@ -153,6 +153,16 @@ const AdminDashboardPage = () => {
       return;
     }
 
+    // Validate email format on frontend
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setFeedback({
+        type: "error",
+        message: "Please provide a valid email address.",
+      });
+      return;
+    }
+
     setAssignLoading(true);
     setFeedback(null);
 
@@ -164,7 +174,10 @@ const AdminDashboardPage = () => {
         body: JSON.stringify({ email }),
       });
 
-      const data = (await response.json()) as { message?: string };
+      const data = (await response.json()) as {
+        message?: string;
+        error?: string;
+      };
 
       if (!response.ok) {
         if (response.status === 403) {
@@ -176,12 +189,19 @@ const AdminDashboardPage = () => {
           return;
         }
 
-        throw new Error(data.message || "Failed to assign agent role");
+        // Show the specific error message from the API
+        const errorMessage =
+          data.message || data.error || "Failed to assign agent role";
+        setFeedback({
+          type: "error",
+          message: errorMessage,
+        });
+        return;
       }
 
       setFeedback({
         type: "success",
-        message: data.message ?? "Agent role assigned.",
+        message: data.message ?? "Agent role assigned successfully.",
       });
       setFormEmail("");
       fetchAgents();

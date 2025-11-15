@@ -60,9 +60,12 @@ export async function DELETE(
   }
 
   if (currentRole !== DEFAULT_ROLE) {
-    db.prepare(
-      'UPDATE "user" SET role = ?, updatedAt = datetime("now") WHERE id = ?'
-    ).run(DEFAULT_ROLE, id);
+    const now = new Date().toISOString();
+    db.prepare('UPDATE "user" SET role = ?, updatedAt = ? WHERE id = ?').run(
+      DEFAULT_ROLE,
+      now,
+      id
+    );
 
     return NextResponse.json({
       message: `${user.email} is no longer an agent`,
