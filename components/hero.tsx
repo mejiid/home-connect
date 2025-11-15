@@ -10,7 +10,7 @@ const Hero: React.FC = () => {
         className="absolute inset-0 w-full h-full object-cover"
       />
       <div className="relative z-20 container mx-auto px-6 text-center">
-        <h1 className="text-4xl md:text-6xl font-bold font-sora leading-tight mb-4 animate-fade-in-up">
+        <h1 className="text-4xl md:text-6xl font-bold font-sora leading-tight mb-4 animate-fade-in-up text-white">
           Connecting Harar, <br /> One Home at a Time.
         </h1>
         <p

@@ -1,11 +1,12 @@
 import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
-import Database from "better-sqlite3";
+import db from "./db";
 
 export const auth = betterAuth({
-  database: new Database("./sqlite.db"),
+  database: db,
   emailAndPassword: {
     enabled: true,
+    disableSignUp: true,
   },
   socialProviders: {
     github: {

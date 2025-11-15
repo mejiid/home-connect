@@ -24,7 +24,9 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
     <h3 className="text-xl font-sora font-semibold mb-3 text-harar-dark">
       {title}
     </h3>
-    <p className="text-gray-600 leading-relaxed">{description}</p>
+    <p className="text-gray-600 leading-relaxed">
+      {description}
+    </p>
   </div>
 );
 

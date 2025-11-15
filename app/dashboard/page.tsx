@@ -33,7 +33,7 @@ export default function DashboardPage() {
 
   if (isPending) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-sky-50">
+      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 via-white to-sky-50">
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4 text-zinc-600">Loading...</p>
@@ -47,7 +47,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-sky-50">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-sky-50">
       {/* Header */}
       <header className="border-b border-zinc-200/60 bg-white/90 backdrop-blur-lg">
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
@@ -55,10 +55,10 @@ export default function DashboardPage() {
             href="/"
             className="group flex items-center gap-2.5 text-lg font-bold tracking-tight text-zinc-900 transition-transform hover:scale-105"
           >
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 via-blue-500 to-sky-400 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all group-hover:shadow-blue-500/50">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-blue-600 via-blue-500 to-sky-400 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all group-hover:shadow-blue-500/50">
               HC
             </span>
-            <span className="bg-gradient-to-r from-blue-600 to-sky-500 bg-clip-text text-transparent">
+            <span className="bg-linear-to-br from-blue-600 to-sky-500 bg-clip-text text-transparent">
               HomeConnect
             </span>
           </Link>
@@ -100,7 +100,7 @@ export default function DashboardPage() {
                 <User className="w-5 h-5 text-blue-600" />
                 Account Information
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="dark:text-gray-400">
                 Your account details and preferences
               </CardDescription>
             </CardHeader>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
                     <CardTitle className="text-lg group-hover:text-blue-600 transition-colors">
                       🏠 Buy Properties
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="dark:text-gray-400">
                       Browse available properties for purchase
                     </CardDescription>
                   </CardHeader>
@@ -160,7 +160,7 @@ export default function DashboardPage() {
                     <CardTitle className="text-lg group-hover:text-blue-600 transition-colors">
                       🔑 Rent Properties
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="dark:text-gray-400">
                       Find rental properties in your area
                     </CardDescription>
                   </CardHeader>
@@ -179,7 +179,7 @@ export default function DashboardPage() {
                     <CardTitle className="text-lg group-hover:text-blue-600 transition-colors">
                       💰 Sell Properties
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="dark:text-gray-400">
                       List your property for sale
                     </CardDescription>
                   </CardHeader>

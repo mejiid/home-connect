@@ -146,7 +146,7 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-sky-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 via-white to-sky-50 p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -155,7 +155,7 @@ export default function SignInPage() {
       >
         <Card className="border-zinc-200/60 shadow-xl">
           <CardHeader className="space-y-3 text-center pb-6">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-sky-400 shadow-lg shadow-blue-500/30">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-blue-600 via-blue-500 to-sky-400 shadow-lg shadow-blue-500/30">
               <span className="text-2xl font-bold text-white">HC</span>
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight">

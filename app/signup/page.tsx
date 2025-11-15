@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -46,8 +45,10 @@ const GitHubIcon = () => (
   </svg>
 );
 
+const RESEND_SECONDS = 45;
+const OTP_LENGTH = 6;
+
 export default function SignUpPage() {
-  const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -58,12 +59,31 @@ export default function SignUpPage() {
     password: "",
     confirmPassword: "",
   });
+  const [step, setStep] = useState<"form" | "otp">("form");
+  const [otpCode, setOtpCode] = useState("");
+  const [otpError, setOtpError] = useState("");
+  const [generalMessage, setGeneralMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [socialLoading, setSocialLoading] = useState<
     "google" | "github" | null
   >(null);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [otpExpiresAt, setOtpExpiresAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!resendCooldown) {
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   // Validate email
   const validateEmail = (email: string) => {
@@ -88,6 +108,10 @@ export default function SignUpPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (step === "otp") {
+      return;
+    }
 
     // Validate form
     const newErrors = {
@@ -122,35 +146,146 @@ export default function SignUpPage() {
     }
 
     setIsLoading(true);
+    setGeneralMessage("");
+    setOtpError("");
 
     try {
-      // Sign up with BetterAuth
-      const result = await authClient.signUp.email({
-        email: formData.email,
-        password: formData.password,
-        name: formData.email.split("@")[0],
+      const response = await fetch("/api/auth/signup/request-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email }),
       });
 
-      console.log("Signup result:", result);
+      const data = (await response.json()) as {
+        message?: string;
+        expiresAt?: string;
+      };
 
-      if (result.error) {
-        console.error("Signup error:", result.error);
+      if (!response.ok) {
         setErrors((prev) => ({
           ...prev,
-          email: result.error?.message || "Failed to create account",
+          email: data.message || "Unable to send verification code",
         }));
         setIsLoading(false);
         return;
       }
 
-      // Success - redirect to home
-      window.location.href = "/";
+      setStep("otp");
+      setGeneralMessage(
+        data.message || "We sent a verification code to your email."
+      );
+      setOtpExpiresAt(data.expiresAt ?? null);
+      setResendCooldown(RESEND_SECONDS);
+      setIsLoading(false);
     } catch (error: any) {
-      console.error("Sign up error:", error);
+      console.error("OTP request error:", error);
       setErrors((prev) => ({
         ...prev,
-        email: error?.message || "An error occurred. Please try again.",
+        email: error?.message || "Failed to send verification code",
       }));
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!otpCode.trim()) {
+      setOtpError("Please enter the verification code you received.");
+      return;
+    }
+
+    if (otpCode.trim().length !== OTP_LENGTH) {
+      setOtpError(`Verification code must be ${OTP_LENGTH} digits.`);
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setOtpError("");
+
+    try {
+      const response = await fetch("/api/auth/signup/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          name: formData.email.split("@")[0],
+          code: otpCode,
+        }),
+      });
+
+      const data = (await response.json()) as { message?: string };
+
+      if (!response.ok) {
+        setOtpError(data.message || "Failed to verify the code");
+        setIsVerifyingOtp(false);
+        return;
+      }
+
+      setGeneralMessage(data.message || "Account created successfully.");
+
+      const result = await authClient.signIn.email({
+        email: formData.email,
+        password: formData.password,
+        callbackURL: "/",
+      });
+
+      if (result.error) {
+        console.error("Auto sign-in error:", result.error);
+        setGeneralMessage(
+          "Account verified. Please sign in with your email and password."
+        );
+        setIsVerifyingOtp(false);
+        return;
+      }
+
+      window.location.href = "/";
+    } catch (error: any) {
+      console.error("OTP verification error:", error);
+      setOtpError(
+        error?.message || "Failed to verify the code. Please try again."
+      );
+      setIsVerifyingOtp(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || step !== "otp") {
+      return;
+    }
+
+    setIsLoading(true);
+    setOtpError("");
+    setGeneralMessage("");
+
+    try {
+      const response = await fetch("/api/auth/signup/request-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: formData.email }),
+      });
+
+      const data = (await response.json()) as {
+        message?: string;
+        expiresAt?: string;
+      };
+
+      if (!response.ok) {
+        setOtpError(data.message || "Unable to resend code right now.");
+        setIsLoading(false);
+        return;
+      }
+
+      setGeneralMessage(
+        data.message || "We sent a fresh verification code to your email."
+      );
+      setOtpExpiresAt(data.expiresAt ?? null);
+      setResendCooldown(RESEND_SECONDS);
+    } catch (error: any) {
+      console.error("Resend OTP error:", error);
+      setOtpError("Failed to resend the code. Please try again later.");
+    } finally {
       setIsLoading(false);
     }
   };
@@ -172,7 +307,7 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-sky-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-r  from-blue-50 via-white to-sky-50 p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -181,7 +316,7 @@ export default function SignUpPage() {
       >
         <Card className="border-zinc-200/60 shadow-xl">
           <CardHeader className="space-y-3 text-center pb-6">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-sky-400 shadow-lg shadow-blue-500/30">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-r  from-blue-600 via-blue-500 to-sky-400 shadow-lg shadow-blue-500/30">
               <span className="text-2xl font-bold text-white">HC</span>
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight">
@@ -193,174 +328,264 @@ export default function SignUpPage() {
           </CardHeader>
 
           <CardContent className="space-y-6">
-            {/* Social Login Buttons */}
-            <div className="space-y-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-11 font-medium hover:border-zinc-300 hover:bg-zinc-50"
-                onClick={() => handleSocialLogin("google")}
-                disabled={socialLoading !== null}
-              >
-                {socialLoading === "google" ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <GoogleIcon />
-                )}
-                <span>Continue with Google</span>
-              </Button>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-11 font-medium hover:border-zinc-300 hover:bg-zinc-50"
-                onClick={() => handleSocialLogin("github")}
-                disabled={socialLoading !== null}
-              >
-                {socialLoading === "github" ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <GitHubIcon />
-                )}
-                <span>Continue with GitHub</span>
-              </Button>
-            </div>
-
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <Separator />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-zinc-500">
-                  or continue with
-                </span>
-              </div>
-            </div>
-
-            {/* Email/Password Form */}
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email Field */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    className="pl-10"
-                    value={formData.email}
-                    onChange={handleChange}
-                    disabled={isLoading}
-                  />
-                </div>
-                {errors.email && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-sm text-red-500"
-                  >
-                    {errors.email}
-                  </motion.p>
-                )}
-              </div>
-
-              {/* Password Field */}
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    className="pl-10 pr-10"
-                    value={formData.password}
-                    onChange={handleChange}
-                    disabled={isLoading}
-                  />
-                  <button
+            {step === "form" ? (
+              <>
+                <div className="space-y-3">
+                  <Button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                    variant="outline"
+                    className="w-full h-11 font-medium hover:border-zinc-300 hover:bg-zinc-50"
+                    onClick={() => handleSocialLogin("google")}
+                    disabled={socialLoading !== null || isLoading}
                   >
-                    {showPassword ? (
-                      <EyeOff className="w-4 h-4" />
+                    {socialLoading === "google" ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
-                      <Eye className="w-4 h-4" />
+                      <GoogleIcon />
                     )}
-                  </button>
-                </div>
-                {errors.password && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-sm text-red-500"
-                  >
-                    {errors.password}
-                  </motion.p>
-                )}
-              </div>
+                    <span>Continue with Google</span>
+                  </Button>
 
-              {/* Confirm Password Field */}
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="••••••••"
-                    className="pl-10 pr-10"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    disabled={isLoading}
-                  />
-                  <button
+                  <Button
                     type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                    variant="outline"
+                    className="w-full h-11 font-medium hover:border-zinc-300 hover:bg-zinc-50"
+                    onClick={() => handleSocialLogin("github")}
+                    disabled={socialLoading !== null || isLoading}
                   >
-                    {showConfirmPassword ? (
-                      <EyeOff className="w-4 h-4" />
+                    {socialLoading === "github" ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
-                      <Eye className="w-4 h-4" />
+                      <GitHubIcon />
                     )}
-                  </button>
+                    <span>Continue with GitHub</span>
+                  </Button>
                 </div>
-                {errors.confirmPassword && (
-                  <motion.p
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-sm text-red-500"
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <Separator />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-zinc-500">
+                      or continue with
+                    </span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                      <Input
+                        id="email"
+                        name="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        className="pl-10"
+                        value={formData.email}
+                        onChange={handleChange}
+                        disabled={isLoading}
+                      />
+                    </div>
+                    {errors.email && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-sm text-red-500"
+                      >
+                        {errors.email}
+                      </motion.p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                      <Input
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        className="pl-10 pr-10"
+                        value={formData.password}
+                        onChange={handleChange}
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                    {errors.password && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-sm text-red-500"
+                      >
+                        {errors.password}
+                      </motion.p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+                      <Input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type={showConfirmPassword ? "text" : "password"}
+                        placeholder="••••••••"
+                        className="pl-10 pr-10"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        disabled={isLoading}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600 transition-colors"
+                      >
+                        {showConfirmPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                    {errors.confirmPassword && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-sm text-red-500"
+                      >
+                        {errors.confirmPassword}
+                      </motion.p>
+                    )}
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full h-11 text-base font-semibold"
+                    disabled={isLoading}
                   >
-                    {errors.confirmPassword}
-                  </motion.p>
-                )}
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Sending code...</span>
+                      </>
+                    ) : (
+                      "Send verification code"
+                    )}
+                  </Button>
+                </form>
+              </>
+            ) : (
+              <div className="space-y-5">
+                <div className="rounded-lg border border-blue-200 bg-blue-50/80 px-4 py-3 text-sm text-blue-700">
+                  <p>We sent a verification code to {formData.email}.</p>
+                  <p className="mt-1">
+                    Enter the {OTP_LENGTH}-digit code to finish creating your
+                    account.
+                    {otpExpiresAt
+                      ? ` The code expires at ${new Date(
+                          otpExpiresAt
+                        ).toLocaleTimeString()}.`
+                      : ""}
+                  </p>
+                  {generalMessage && (
+                    <p className="mt-2 text-blue-600">{generalMessage}</p>
+                  )}
+                </div>
+
+                <form onSubmit={handleVerifyOtp} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="otp">Verification code</Label>
+                    <Input
+                      id="otp"
+                      name="otp"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      maxLength={OTP_LENGTH}
+                      value={otpCode}
+                      onChange={(event) => {
+                        const value = event.target.value.replace(/[^0-9]/g, "");
+                        setOtpCode(value);
+                        if (otpError) {
+                          setOtpError("");
+                        }
+                      }}
+                      disabled={isVerifyingOtp}
+                      className="tracking-[0.4em] text-lg"
+                    />
+                    {otpError && (
+                      <motion.p
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-sm text-red-500"
+                      >
+                        {otpError}
+                      </motion.p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <Button
+                      type="submit"
+                      className="h-11 text-base font-semibold sm:flex-1"
+                      disabled={isVerifyingOtp}
+                    >
+                      {isVerifyingOtp ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Verifying code...</span>
+                        </>
+                      ) : (
+                        "Verify and create account"
+                      )}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 sm:w-48"
+                      onClick={handleResendOtp}
+                      disabled={
+                        resendCooldown > 0 || isVerifyingOtp || isLoading
+                      }
+                    >
+                      {resendCooldown > 0 ? (
+                        <span>Resend in {resendCooldown}s</span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <RefreshCw className="h-4 w-4" />
+                          Resend code
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+
+                <p className="text-xs text-zinc-500">
+                  Didn&apos;t get the email? Check your spam folder or resend
+                  the code above.
+                </p>
               </div>
+            )}
 
-              {/* Submit Button */}
-              <Button
-                type="submit"
-                className="w-full h-11 text-base font-semibold"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Creating account...</span>
-                  </>
-                ) : (
-                  "Sign Up"
-                )}
-              </Button>
-            </form>
-
-            {/* Sign In Link */}
             <p className="text-center text-sm text-zinc-600">
               Already have an account?{" "}
               <Link

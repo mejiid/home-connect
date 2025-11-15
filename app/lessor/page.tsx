@@ -2,10 +2,10 @@ import Navbar from "@/components/navbar";
 
 export default function LessorPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-50 via-white to-blue-50 dark:from-zinc-950 dark:via-zinc-900 dark:to-blue-950">
+    <div className="min-h-screen bg-linear-to-br from-zinc-50 via-white to-blue-50">
       <main className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="text-center">
-          <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-sky-400 shadow-lg shadow-blue-500/30">
+          <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-2xl bg-linear-to-br from-blue-600 via-blue-500 to-sky-400 shadow-lg shadow-blue-500/30">
             <svg
               className="h-10 w-10 text-white"
               fill="none"
@@ -20,10 +20,10 @@ export default function LessorPage() {
               />
             </svg>
           </div>
-          <h1 className="mb-4 text-4xl font-bold tracking-tight text-zinc-900 dark:text-white sm:text-5xl">
+          <h1 className="mb-4 text-4xl font-bold tracking-tight text-zinc-900 sm:text-5xl">
             Lessor Services
           </h1>
-          <p className="mx-auto max-w-2xl text-lg text-zinc-600 dark:text-zinc-400">
+          <p className="mx-auto max-w-2xl text-lg text-zinc-600">
             Manage your properties and connect with potential tenants.
           </p>
         </div>
