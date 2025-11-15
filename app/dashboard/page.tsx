@@ -88,7 +88,7 @@ export default function DashboardPage() {
               Welcome back, {session.user?.name || "User"}! 🎉
             </h1>
             <p className="text-lg text-zinc-600">
-              You've successfully signed up to HomeConnect. Explore properties
+              You&apos;ve successfully signed up to HomeConnect. Explore properties
               and find your dream home.
             </p>
           </div>

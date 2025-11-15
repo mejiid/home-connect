@@ -133,11 +133,11 @@ export default function ForgotPasswordPage() {
       setOtpExpiresAt(data.expiresAt ?? null);
       setResendCooldown(RESEND_SECONDS);
       setIsLoading(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Password reset request error:", error);
       setErrors((prev) => ({
         ...prev,
-        email: error?.message || "Failed to send password reset code",
+        email: error instanceof Error ? error.message : "Failed to send password reset code",
       }));
       setIsLoading(false);
     }
@@ -216,10 +216,10 @@ export default function ForgotPasswordPage() {
       setTimeout(() => {
         router.push("/signin");
       }, 2000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Password reset error:", error);
       setOtpError(
-        error?.message || "Failed to reset password. Please try again."
+        error instanceof Error ? error.message : "Failed to reset password. Please try again."
       );
       setIsResetting(false);
     }
@@ -260,7 +260,7 @@ export default function ForgotPasswordPage() {
       );
       setOtpExpiresAt(data.expiresAt ?? null);
       setResendCooldown(RESEND_SECONDS);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Resend OTP error:", error);
       setOtpError("Failed to resend the code. Please try again later.");
     } finally {

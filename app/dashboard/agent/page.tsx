@@ -199,7 +199,7 @@ const AgentDashboardPage = () => {
                 <CardContent>
                   <div className="text-2xl font-bold text-zinc-900">0</div>
                   <p className="text-xs text-zinc-500 mt-1">
-                    Properties you're managing
+                    Properties you&apos;re managing
                   </p>
                 </CardContent>
               </Card>

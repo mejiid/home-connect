@@ -1,5 +1,3 @@
-import Navbar from "@/components/navbar";
-
 export default function LessorPage() {
   return (
     <div className="min-h-screen bg-linear-to-br from-zinc-50 via-white to-blue-50">

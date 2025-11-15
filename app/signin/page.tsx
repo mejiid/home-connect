@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -47,7 +46,6 @@ const GitHubIcon = () => (
 );
 
 export default function SignInPage() {
-  const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -119,11 +117,11 @@ export default function SignInPage() {
 
       // Success - redirect to home
       window.location.href = "/";
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Sign in error:", error);
       setErrors((prev) => ({
         ...prev,
-        email: error?.message || "An error occurred. Please try again.",
+        email: error instanceof Error ? error.message : "An error occurred. Please try again.",
       }));
       setIsLoading(false);
     }
@@ -306,7 +304,7 @@ export default function SignInPage() {
 
             {/* Sign Up Link */}
             <p className="text-center text-sm text-zinc-600">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link
                 href="/signup"
                 className="font-medium text-blue-600 hover:text-blue-700 hover:underline transition-colors"

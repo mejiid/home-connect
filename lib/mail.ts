@@ -129,8 +129,8 @@ export const sendOtpEmail = async ({
     return info;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorCode = (error as any)?.code;
-    const errorResponse = (error as any)?.response;
+    const errorCode = error && typeof error === 'object' && 'code' in error ? (error as { code?: string }).code : undefined;
+    const errorResponse = error && typeof error === 'object' && 'response' in error ? (error as { response?: string }).response : undefined;
     
     console.error("Failed to dispatch OTP email", {
       to,
@@ -222,8 +222,8 @@ export const sendPasswordResetEmail = async ({
     return info;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorCode = (error as any)?.code;
-    const errorResponse = (error as any)?.response;
+    const errorCode = error && typeof error === 'object' && 'code' in error ? (error as { code?: string }).code : undefined;
+    const errorResponse = error && typeof error === 'object' && 'response' in error ? (error as { response?: string }).response : undefined;
     
     console.error("Failed to dispatch password reset email", {
       to,
