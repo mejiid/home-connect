@@ -35,13 +35,14 @@ export const getSessionWithRole = async (
       (result && "data" in result ? result.data : null) ??
       (result && "user" in result ? result : null);
 
-    const userId = sessionData?.user?.id;
+    const sessionUser = sessionData?.user;
+    const userId = sessionUser?.id;
 
     if (!userId) {
       return null;
     }
 
-    const directRole = sessionData.user.role;
+    const directRole = sessionUser?.role;
 
     let resolvedRole = normalizeRole(directRole ?? DEFAULT_ROLE);
 

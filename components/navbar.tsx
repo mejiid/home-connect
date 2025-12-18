@@ -123,6 +123,8 @@ const Navbar = () => {
     return roleLinks;
   })();
 
+  const showUserDashboardLink = userRole !== "admin" && userRole !== "agent";
+
   const menuLinks = [...links, ...roleSpecificLinks];
 
   useEffect(() => {
@@ -282,6 +284,16 @@ const Navbar = () => {
                     </div>
                     <div className="p-2">
                       <div className="space-y-1">
+                        {showUserDashboardLink && (
+                          <Link
+                            href="/dashboard"
+                            onClick={closeMenu}
+                            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-zinc-700 transition-colors hover:bg-zinc-100"
+                          >
+                            <Home className="h-4 w-4" />
+                            Dashboard
+                          </Link>
+                        )}
                         {roleSpecificLinks.map(
                           ({ href, label, icon: IconLink }) => (
                             <Link
@@ -439,6 +451,16 @@ const Navbar = () => {
                         </div>
                       </div>
                     </div>
+                    {showUserDashboardLink && (
+                      <Link
+                        href="/dashboard"
+                        className="flex items-center justify-center gap-2 w-full rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-center text-sm font-medium text-zinc-700 transition-all hover:border-blue-600 hover:bg-blue-50 hover:text-blue-600 active:scale-95"
+                        onClick={closeMenu}
+                      >
+                        <Home className="h-4 w-4" />
+                        Dashboard
+                      </Link>
+                    )}
                     {roleSpecificLinks.length > 0 && (
                       <div className="flex flex-col gap-2">
                         {roleSpecificLinks.map(

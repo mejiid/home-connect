@@ -10,7 +10,12 @@ import {
   Users,
   FileText,
   Settings,
-  LogOut,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Eye,
+  X,
+  Map,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -22,6 +27,24 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { authClient } from "@/lib/client";
+import { FilePreviewModal } from "@/components/file-preview-modal";
+
+type Submission = {
+  id: string;
+  type: "sell" | "lessor";
+  fullName: string;
+  phoneNumber: string;
+  woreda: string;
+  kebele: string;
+  village: string;
+  identityDocumentUrl: string;
+  homeMapUrl: string;
+  status: "pending" | "accepted" | "rejected";
+  createdAt?: string;
+  updatedAt?: string;
+  email: string;
+  userName?: string | null;
+};
 
 const AgentDashboardPage = () => {
   const router = useRouter();
@@ -29,6 +52,21 @@ const AgentDashboardPage = () => {
 
   const [isCheckingRole, setIsCheckingRole] = useState(true);
   const [isAgent, setIsAgent] = useState(false);
+  const [submissions, setSubmissions] = useState<{ sell: Submission[]; lessor: Submission[] }>({ sell: [], lessor: [] });
+  const [submissionsLoading, setSubmissionsLoading] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  
+  // Preview Modal State
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState("");
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const openPreview = (url: string, title: string) => {
+    setPreviewUrl(url);
+    setPreviewTitle(title);
+    setIsPreviewOpen(true);
+  };
 
   useEffect(() => {
     if (isPending) {
@@ -68,15 +106,23 @@ const AgentDashboardPage = () => {
         setIsCheckingRole(false);
 
         if (!agent) {
-          // Redirect to regular dashboard if not an agent
-          router.push("/dashboard");
+          if (resolvedRole === "admin") {
+            router.replace("/dashboard/admin");
+            return;
+          }
+
+          // Regular users should use the user dashboard.
+          router.replace("/dashboard");
+          return;
         }
+
+        fetchSubmissions();
       } catch (error) {
         console.error("Failed to resolve role", error);
         if (isMounted) {
           setIsAgent(false);
           setIsCheckingRole(false);
-          router.push("/dashboard");
+          router.replace("/");
         }
       }
     };
@@ -89,14 +135,78 @@ const AgentDashboardPage = () => {
     };
   }, [session?.user, isPending, router]);
 
-  const handleSignOut = async () => {
-    await authClient.signOut();
-    router.push("/");
+  const fetchSubmissions = async () => {
+    setSubmissionsLoading(true);
+    try {
+      const response = await fetch("/api/submissions/all", {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = (await response.json()) as {
+          sell: Submission[];
+          lessor: Submission[];
+        };
+        setSubmissions(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch submissions:", error);
+    } finally {
+      setSubmissionsLoading(false);
+    }
+  };
+
+  const handleStatusUpdate = async (id: string, type: "sell" | "lessor", newStatus: "accepted" | "rejected") => {
+    setUpdatingStatus(id);
+    try {
+      const response = await fetch(`/api/submissions/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: newStatus, type }),
+      });
+
+      if (response.ok) {
+        await fetchSubmissions();
+        if (selectedSubmission?.id === id) {
+          setSelectedSubmission({ ...selectedSubmission, status: newStatus });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to update status:", error);
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "accepted":
+        return (
+          <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Accepted
+          </span>
+        );
+      case "rejected":
+        return (
+          <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+            <XCircle className="h-3 w-3 mr-1" />
+            Rejected
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-700 ring-1 ring-inset ring-yellow-600/20">
+            <Clock className="h-3 w-3 mr-1" />
+            Pending
+          </span>
+        );
+    }
   };
 
   if (isPending || isCheckingRole) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 via-white to-sky-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-sky-50">
         <div className="flex flex-col items-center gap-3 text-zinc-600">
           <Loader2 className="h-8 w-8 animate-spin" />
           <p>Checking permissions...</p>
@@ -107,7 +217,7 @@ const AgentDashboardPage = () => {
 
   if (!isAgent) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-zinc-50 via-white to-blue-50">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-50 via-white to-blue-50">
         <Card className="max-w-md border-zinc-200/80 shadow-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg font-semibold text-zinc-900">
@@ -117,9 +227,7 @@ const AgentDashboardPage = () => {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-zinc-600">
             <p>This area is limited to agents only.</p>
-            <Button onClick={() => router.push("/dashboard")}>
-              Return to dashboard
-            </Button>
+            <Button onClick={() => router.push("/")}>Go Home</Button>
           </CardContent>
         </Card>
       </div>
@@ -127,35 +235,7 @@ const AgentDashboardPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-sky-50">
-      {/* Header */}
-      <header className="border-b border-zinc-200/60 bg-white/90 backdrop-blur-lg">
-        <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            className="group flex items-center gap-2.5 text-lg font-bold tracking-tight text-zinc-900 transition-transform hover:scale-105"
-          >
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-linear-to-br from-blue-600 via-blue-500 to-sky-400 text-sm font-bold text-white shadow-lg shadow-blue-500/30 transition-all group-hover:shadow-blue-500/50">
-              HC
-            </span>
-            <span className="bg-linear-to-br from-blue-600 to-sky-500 bg-clip-text text-transparent">
-              HomeConnect
-            </span>
-          </Link>
-
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
-              <BadgeCheck className="h-3 w-3" />
-              Agent
-            </span>
-            <Button onClick={handleSignOut} variant="outline" className="font-medium">
-              <LogOut className="w-4 h-4" />
-              Sign Out
-            </Button>
-          </div>
-        </nav>
-      </header>
-
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-sky-50">
       {/* Main Content */}
       <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <motion.div
@@ -167,7 +247,7 @@ const AgentDashboardPage = () => {
           {/* Welcome Section */}
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-blue-600 via-blue-500 to-sky-400 shadow-lg shadow-blue-500/30">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 via-blue-500 to-sky-400 shadow-lg shadow-blue-500/30">
                 <BadgeCheck className="h-7 w-7 text-white" />
               </div>
               <div>
@@ -199,7 +279,7 @@ const AgentDashboardPage = () => {
                 <CardContent>
                   <div className="text-2xl font-bold text-zinc-900">0</div>
                   <p className="text-xs text-zinc-500 mt-1">
-                    Properties you're managing
+                    Properties you&apos;re managing
                   </p>
                 </CardContent>
               </Card>
@@ -248,6 +328,168 @@ const AgentDashboardPage = () => {
             </motion.div>
           </div>
 
+          {/* Submissions Section */}
+          <Card className="border-zinc-200/60 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-600" />
+                Property Submissions
+              </CardTitle>
+              <CardDescription>
+                Review and manage property listing submissions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {/* Sell Submissions */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <Home className="h-4 w-4 text-blue-600" />
+                    Sell Homes
+                  </h3>
+                  {submissionsLoading ? (
+                    <div className="flex items-center justify-center p-6">
+                      <Loader2 className="h-6 w-6 animate-spin text-zinc-600" />
+                    </div>
+                  ) : submissions.sell.length === 0 ? (
+                    <p className="text-center text-zinc-500 py-4 text-sm">No sell submissions</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {submissions.sell.map((submission) => (
+                        <div
+                          key={submission.id}
+                          className="border border-zinc-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium text-sm">{submission.fullName}</span>
+                                {getStatusBadge(submission.status)}
+                              </div>
+                              <p className="text-xs text-zinc-600">
+                                {submission.email} • {submission.woreda}, {submission.kebele}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedSubmission(submission)}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
+                              {submission.status === "pending" && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleStatusUpdate(submission.id, "sell", "accepted")}
+                                    disabled={updatingStatus === submission.id}
+                                  >
+                                    {updatingStatus === submission.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      "Accept"
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleStatusUpdate(submission.id, "sell", "rejected")}
+                                    disabled={updatingStatus === submission.id}
+                                  >
+                                    {updatingStatus === submission.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      "Reject"
+                                    )}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Lessor Submissions */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <Home className="h-4 w-4 text-green-600" />
+                    Lessor Homes
+                  </h3>
+                  {submissionsLoading ? (
+                    <div className="flex items-center justify-center p-6">
+                      <Loader2 className="h-6 w-6 animate-spin text-zinc-600" />
+                    </div>
+                  ) : submissions.lessor.length === 0 ? (
+                    <p className="text-center text-zinc-500 py-4 text-sm">No lessor submissions</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {submissions.lessor.map((submission) => (
+                        <div
+                          key={submission.id}
+                          className="border border-zinc-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+                        >
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-medium text-sm">{submission.fullName}</span>
+                                {getStatusBadge(submission.status)}
+                              </div>
+                              <p className="text-xs text-zinc-600">
+                                {submission.email} • {submission.woreda}, {submission.kebele}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedSubmission(submission)}
+                              >
+                                <Eye className="h-3 w-3 mr-1" />
+                                View
+                              </Button>
+                              {submission.status === "pending" && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handleStatusUpdate(submission.id, "lessor", "accepted")}
+                                    disabled={updatingStatus === submission.id}
+                                  >
+                                    {updatingStatus === submission.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      "Accept"
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => handleStatusUpdate(submission.id, "lessor", "rejected")}
+                                    disabled={updatingStatus === submission.id}
+                                  >
+                                    {updatingStatus === submission.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      "Reject"
+                                    )}
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Quick Actions */}
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <motion.div
@@ -255,7 +497,7 @@ const AgentDashboardPage = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.4 }}
             >
-              <Link href="/sell">
+              <Link href="/dashboard/properties/add">
                 <Card className="border-zinc-200/60 shadow-lg hover:shadow-xl transition-all cursor-pointer group h-full">
                   <CardHeader>
                     <CardTitle className="text-lg group-hover:text-blue-600 transition-colors flex items-center gap-2">
@@ -372,6 +614,122 @@ const AgentDashboardPage = () => {
           </Card>
         </motion.div>
       </main>
+
+      {/* Submission Detail Modal */}
+      {selectedSubmission && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-zinc-200 p-4 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-zinc-900">Submission Details</h2>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedSubmission(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="flex items-center gap-3">
+                <span className="font-semibold">Type:</span>
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                  {selectedSubmission.type === "sell" ? "Sell" : "Lessor"}
+                </span>
+                {getStatusBadge(selectedSubmission.status)}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-zinc-600">Full Name</label>
+                  <p className="text-zinc-900">{selectedSubmission.fullName}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-zinc-600">Phone Number</label>
+                  <p className="text-zinc-900">{selectedSubmission.phoneNumber}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-zinc-600">Email</label>
+                  <p className="text-zinc-900">{selectedSubmission.email}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-zinc-600">Woreda</label>
+                  <p className="text-zinc-900">{selectedSubmission.woreda}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-zinc-600">Kebele</label>
+                  <p className="text-zinc-900">{selectedSubmission.kebele}</p>
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm font-medium text-zinc-600">Village</label>
+                  <p className="text-zinc-900">{selectedSubmission.village}</p>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-zinc-600 mb-2 block">Identity Document</label>
+                <Button
+                  variant="link"
+                  className="px-0 text-blue-600 h-auto font-normal hover:no-underline hover:text-blue-700 flex items-center gap-2"
+                  onClick={() => openPreview(selectedSubmission.identityDocumentUrl, "Identity Document")}
+                >
+                  <FileText className="h-4 w-4" />
+                  View Document
+                </Button>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-zinc-600 mb-2 block">Government Home Map</label>
+                <Button
+                  variant="link"
+                  className="px-0 text-blue-600 h-auto font-normal hover:no-underline hover:text-blue-700 flex items-center gap-2"
+                  onClick={() => openPreview(selectedSubmission.homeMapUrl, "Government Home Map")}
+                >
+                  <Map className="h-4 w-4" />
+                  View Map
+                </Button>
+              </div>
+
+              {selectedSubmission.status === "pending" && (
+                <div className="pt-4 border-t border-zinc-200 flex gap-3">
+                  <Button
+                    onClick={() => {
+                      handleStatusUpdate(selectedSubmission.id, selectedSubmission.type, "accepted");
+                      setSelectedSubmission(null);
+                    }}
+                    disabled={updatingStatus === selectedSubmission.id}
+                  >
+                    {updatingStatus === selectedSubmission.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                    )}
+                    Accept
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={() => {
+                      handleStatusUpdate(selectedSubmission.id, selectedSubmission.type, "rejected");
+                      setSelectedSubmission(null);
+                    }}
+                    disabled={updatingStatus === selectedSubmission.id}
+                  >
+                    {updatingStatus === selectedSubmission.id ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <XCircle className="h-4 w-4 mr-2" />
+                    )}
+                    Reject
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* File Preview Modal */}
+      <FilePreviewModal
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        url={previewUrl}
+        title={previewTitle}
+      />
     </div>
   );
 };

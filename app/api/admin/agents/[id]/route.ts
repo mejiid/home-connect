@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 import db from "@/lib/db";
 import { ADMIN_ROLE, DEFAULT_ROLE, normalizeRole } from "@/lib/roles";
@@ -11,7 +11,7 @@ const unauthorizedResponse = NextResponse.json(
   { status: 403 }
 );
 
-const ensureAdmin = async (request: Request) => {
+const ensureAdmin = async (request: NextRequest) => {
   const session = await getSessionWithRole(request);
 
   if (!session || session.role !== ADMIN_ROLE) {
@@ -22,8 +22,8 @@ const ensureAdmin = async (request: Request) => {
 };
 
 export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
   const adminSession = await ensureAdmin(request);
 
@@ -31,7 +31,7 @@ export async function DELETE(
     return unauthorizedResponse;
   }
 
-  const id = params.id;
+  const { id } = await params;
 
   if (!id) {
     return NextResponse.json(

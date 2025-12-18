@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Shield, UserCheck, UserMinus } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Shield, UserCheck, UserMinus, FileText, Home, CheckCircle2, XCircle, Clock, Eye, X, Map } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +17,24 @@ type Agent = {
   name?: string | null;
   createdAt?: string;
   updatedAt?: string;
+};
+
+type Submission = {
+  id: string;
+  type: "sell" | "lessor";
+  userId: string;
+  fullName: string;
+  phoneNumber: string;
+  woreda: string;
+  kebele: string;
+  village: string;
+  identityDocumentUrl: string;
+  homeMapUrl: string;
+  status: "pending" | "accepted" | "rejected";
+  createdAt: string;
+  updatedAt: string;
+  email: string;
+  userName: string | null;
 };
 
 const formatDate = (value?: string) => {
@@ -42,6 +61,11 @@ const AdminDashboardPage = () => {
     type: "error" | "success";
     message: string;
   } | null>(null);
+  const [submissions, setSubmissions] = useState<{ sell: Submission[]; lessor: Submission[] }>({ sell: [], lessor: [] });
+  const [submissionsLoading, setSubmissionsLoading] = useState(false);
+  const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"agents" | "submissions">("agents");
 
   const fetchAgents = useCallback(async () => {
     setAgentsLoading(true);
@@ -84,6 +108,23 @@ const AdminDashboardPage = () => {
     }
   }, []);
 
+  const fetchSubmissions = useCallback(async () => {
+    setSubmissionsLoading(true);
+    try {
+      const response = await fetch("/api/submissions/all", {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setSubmissions(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch submissions:", error);
+    } finally {
+      setSubmissionsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (isPending) {
       return;
@@ -117,12 +158,18 @@ const AdminDashboardPage = () => {
           return;
         }
 
+        if (resolvedRole === "agent") {
+          router.replace("/dashboard/agent");
+          return;
+        }
+
         const admin = resolvedRole === "admin";
         setIsAdmin(admin);
         setIsCheckingRole(false);
 
         if (admin) {
           fetchAgents();
+          fetchSubmissions();
         }
       } catch (error) {
         console.error("Failed to resolve role", error);
@@ -139,7 +186,7 @@ const AdminDashboardPage = () => {
       isMounted = false;
       controller.abort();
     };
-  }, [session?.user, isPending, router, fetchAgents]);
+  }, [session?.user, isPending, router, fetchAgents, fetchSubmissions]);
 
   const handleAssignAgent = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -255,6 +302,55 @@ const AdminDashboardPage = () => {
 
   const totalAgents = useMemo(() => agents.length, [agents]);
 
+  const handleStatusUpdate = async (id: string, type: "sell" | "lessor", newStatus: "accepted" | "rejected") => {
+    setUpdatingStatus(id);
+    try {
+      const response = await fetch(`/api/submissions/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status: newStatus, type }),
+      });
+
+      if (response.ok) {
+        await fetchSubmissions();
+        if (selectedSubmission?.id === id) {
+          setSelectedSubmission({ ...selectedSubmission, status: newStatus });
+        }
+      }
+    } catch (error) {
+      console.error("Failed to update status:", error);
+    } finally {
+      setUpdatingStatus(null);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "accepted":
+        return (
+          <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Accepted
+          </span>
+        );
+      case "rejected":
+        return (
+          <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
+            <XCircle className="h-3 w-3 mr-1" />
+            Rejected
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center rounded-full bg-yellow-50 px-2 py-1 text-xs font-medium text-yellow-700 ring-1 ring-inset ring-yellow-600/20">
+            <Clock className="h-3 w-3 mr-1" />
+            Pending
+          </span>
+        );
+    }
+  };
+
   if (isPending || isCheckingRole) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-50 via-white to-sky-50">
@@ -278,9 +374,7 @@ const AdminDashboardPage = () => {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-zinc-600">
             <p>This area is limited to administrators.</p>
-            <Button onClick={() => router.push("/dashboard")}>
-              Return to dashboard
-            </Button>
+            <Button onClick={() => router.push("/")}>Go Home</Button>
           </CardContent>
         </Card>
       </div>
@@ -289,7 +383,7 @@ const AdminDashboardPage = () => {
 
   return (
     <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-sky-50">
-      <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
         <div className="mb-8 flex flex-col gap-2">
           <div className="flex items-center gap-3 text-zinc-700">
             <Shield className="h-8 w-8 text-blue-600" />
@@ -298,12 +392,45 @@ const AdminDashboardPage = () => {
                 Admin Control Center
               </h1>
               <p className="text-sm text-zinc-600">
-                Manage which users have access to the agent dashboard.
+                Manage agents and review property submissions.
               </p>
             </div>
           </div>
+          <div className="flex justify-end">
+            <Link href="/dashboard/properties/add">
+              <Button className="flex items-center gap-2">
+                <Home className="h-4 w-4" />
+                List New Property
+              </Button>
+            </Link>
+          </div>
         </div>
 
+        {/* Tabs */}
+        <div className="mb-6 flex gap-2 border-b border-zinc-200">
+          <button
+            onClick={() => setActiveTab("agents")}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === "agents"
+                ? "border-b-2 border-blue-600 text-blue-600"
+                : "text-zinc-600 hover:text-zinc-900"
+            }`}
+          >
+            Agents
+          </button>
+          <button
+            onClick={() => setActiveTab("submissions")}
+            className={`px-4 py-2 font-medium transition-colors ${
+              activeTab === "submissions"
+                ? "border-b-2 border-blue-600 text-blue-600"
+                : "text-zinc-600 hover:text-zinc-900"
+            }`}
+          >
+            Submissions
+          </button>
+        </div>
+
+        {activeTab === "agents" && (
         <div className="grid gap-6 lg:grid-cols-[1.25fr,1fr]">
           <Card className="border-zinc-200/70 shadow-lg">
             <CardHeader className="flex flex-row items-center justify-between">
@@ -430,6 +557,281 @@ const AdminDashboardPage = () => {
             </CardContent>
           </Card>
         </div>
+        )}
+
+        {activeTab === "submissions" && (
+          <div className="space-y-6">
+            {/* Sell Submissions */}
+            <Card className="border-zinc-200/70 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Home className="h-5 w-5 text-blue-600" />
+                  Sell Homes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {submissionsLoading ? (
+                  <div className="flex items-center justify-center p-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-zinc-600" />
+                  </div>
+                ) : submissions.sell.length === 0 ? (
+                  <p className="text-center text-zinc-500 py-6">No sell submissions</p>
+                ) : (
+                  <div className="space-y-3">
+                    {submissions.sell.map((submission) => (
+                      <div
+                        key={submission.id}
+                        className="border border-zinc-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="font-semibold">{submission.fullName}</span>
+                              {getStatusBadge(submission.status)}
+                            </div>
+                            <p className="text-sm text-zinc-600 mb-1">
+                              {submission.email} • {submission.woreda}, {submission.kebele}, {submission.village}
+                            </p>
+                            <p className="text-xs text-zinc-500">
+                              Submitted: {formatDate(submission.createdAt)}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedSubmission(submission)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View
+                            </Button>
+                            {submission.status === "pending" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleStatusUpdate(submission.id, "sell", "accepted")}
+                                  disabled={updatingStatus === submission.id}
+                                >
+                                  {updatingStatus === submission.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    "Accept"
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleStatusUpdate(submission.id, "sell", "rejected")}
+                                  disabled={updatingStatus === submission.id}
+                                >
+                                  {updatingStatus === submission.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    "Reject"
+                                  )}
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Lessor Submissions */}
+            <Card className="border-zinc-200/70 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Home className="h-5 w-5 text-green-600" />
+                  Lessor Homes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {submissionsLoading ? (
+                  <div className="flex items-center justify-center p-6">
+                    <Loader2 className="h-6 w-6 animate-spin text-zinc-600" />
+                  </div>
+                ) : submissions.lessor.length === 0 ? (
+                  <p className="text-center text-zinc-500 py-6">No lessor submissions</p>
+                ) : (
+                  <div className="space-y-3">
+                    {submissions.lessor.map((submission) => (
+                      <div
+                        key={submission.id}
+                        className="border border-zinc-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="font-semibold">{submission.fullName}</span>
+                              {getStatusBadge(submission.status)}
+                            </div>
+                            <p className="text-sm text-zinc-600 mb-1">
+                              {submission.email} • {submission.woreda}, {submission.kebele}, {submission.village}
+                            </p>
+                            <p className="text-xs text-zinc-500">
+                              Submitted: {formatDate(submission.createdAt)}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSelectedSubmission(submission)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View
+                            </Button>
+                            {submission.status === "pending" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleStatusUpdate(submission.id, "lessor", "accepted")}
+                                  disabled={updatingStatus === submission.id}
+                                >
+                                  {updatingStatus === submission.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    "Accept"
+                                  )}
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleStatusUpdate(submission.id, "lessor", "rejected")}
+                                  disabled={updatingStatus === submission.id}
+                                >
+                                  {updatingStatus === submission.id ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    "Reject"
+                                  )}
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Submission Detail Modal */}
+        {selectedSubmission && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="sticky top-0 bg-white border-b border-zinc-200 p-4 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-zinc-900">Submission Details</h2>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedSubmission(null)}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <div className="p-6 space-y-6">
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold">Type:</span>
+                  <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+                    {selectedSubmission.type === "sell" ? "Sell" : "Lessor"}
+                  </span>
+                  {getStatusBadge(selectedSubmission.status)}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-zinc-600">Full Name</label>
+                    <p className="text-zinc-900">{selectedSubmission.fullName}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-zinc-600">Phone Number</label>
+                    <p className="text-zinc-900">{selectedSubmission.phoneNumber}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-zinc-600">Email</label>
+                    <p className="text-zinc-900">{selectedSubmission.email}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-zinc-600">Woreda</label>
+                    <p className="text-zinc-900">{selectedSubmission.woreda}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-zinc-600">Kebele</label>
+                    <p className="text-zinc-900">{selectedSubmission.kebele}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-sm font-medium text-zinc-600">Village</label>
+                    <p className="text-zinc-900">{selectedSubmission.village}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-zinc-600 mb-2 block">Identity Document</label>
+                  <a
+                    href={selectedSubmission.identityDocumentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline flex items-center gap-2"
+                  >
+                    <FileText className="h-4 w-4" />
+                    View Document
+                  </a>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-zinc-600 mb-2 block">Government Home Map</label>
+                  <a
+                    href={selectedSubmission.homeMapUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline flex items-center gap-2"
+                  >
+                    <Map className="h-4 w-4" />
+                    View Map
+                  </a>
+                </div>
+
+                {selectedSubmission.status === "pending" && (
+                  <div className="pt-4 border-t border-zinc-200 flex gap-3">
+                    <Button
+                      onClick={() => {
+                        handleStatusUpdate(selectedSubmission.id, selectedSubmission.type, "accepted");
+                        setSelectedSubmission(null);
+                      }}
+                      disabled={updatingStatus === selectedSubmission.id}
+                    >
+                      {updatingStatus === selectedSubmission.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                      )}
+                      Accept
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        handleStatusUpdate(selectedSubmission.id, selectedSubmission.type, "rejected");
+                        setSelectedSubmission(null);
+                      }}
+                      disabled={updatingStatus === selectedSubmission.id}
+                    >
+                      {updatingStatus === selectedSubmission.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <XCircle className="h-4 w-4 mr-2" />
+                      )}
+                      Reject
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
