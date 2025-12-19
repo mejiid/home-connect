@@ -1,49 +1,118 @@
 import nodemailer from "nodemailer";
 
+const normalizeEnvValue = (value: string | undefined) => value?.trim();
+
+const parsePort = (value: string | undefined, fallback: number) => {
+  const parsed = Number.parseInt((value ?? "").trim(), 10);
+  return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+type EmailProvider = "gmail" | "mailtrap";
+
+const emailProvider = (
+  normalizeEnvValue(process.env.EMAIL_PROVIDER)?.toLowerCase() as EmailProvider | undefined
+) ?? "gmail";
+
 // Gmail SMTP configuration
-const host = process.env.GMAIL_HOST || "smtp.gmail.com";
-const port = Number(process.env.GMAIL_PORT ?? 587);
-const user = process.env.GMAIL_USER; // Your Gmail address
-const pass = process.env.GMAIL_APP_PASSWORD; // Gmail App Password (not regular password)
+const gmailHost = normalizeEnvValue(process.env.GMAIL_HOST) || "smtp.gmail.com";
+const gmailPort = parsePort(process.env.GMAIL_PORT, 587);
+const gmailUser = normalizeEnvValue(process.env.GMAIL_USER);
+// Gmail App Passwords are often shown with spaces; strip them so auth works.
+const gmailPass = normalizeEnvValue(process.env.GMAIL_APP_PASSWORD)?.replace(/\s+/g, "");
+
+// Mailtrap SMTP configuration (useful for development/testing)
+const mailtrapHost = normalizeEnvValue(process.env.MAILTRAP_HOST);
+const mailtrapPort = parsePort(process.env.MAILTRAP_PORT, 2525);
+const mailtrapUser = normalizeEnvValue(process.env.MAILTRAP_USER);
+const mailtrapPass = normalizeEnvValue(process.env.MAILTRAP_PASS);
 
 const transporter = (() => {
-  if (!user || !pass) {
+  const provider = emailProvider;
+
+  if (provider === "mailtrap") {
     const missing = [];
-    if (!user) missing.push("GMAIL_USER");
-    if (!pass) missing.push("GMAIL_APP_PASSWORD");
-    
+    if (!mailtrapHost) missing.push("MAILTRAP_HOST");
+    if (!mailtrapUser) missing.push("MAILTRAP_USER");
+    if (!mailtrapPass) missing.push("MAILTRAP_PASS");
+
+    if (missing.length) {
+      console.error(
+        `Mailtrap credentials are missing: ${missing.join(", ")}. OTP emails will not be sent.`
+      );
+      return null;
+    }
+
+    try {
+      const transport = nodemailer.createTransport({
+        host: mailtrapHost,
+        port: mailtrapPort,
+        secure: false,
+        auth: {
+          user: mailtrapUser,
+          pass: mailtrapPass,
+        },
+      });
+
+      console.log("Mailtrap SMTP transporter created", {
+        host: mailtrapHost,
+        port: mailtrapPort,
+        user: mailtrapUser ? `${mailtrapUser.substring(0, 3)}***` : "missing",
+      });
+
+      return transport;
+    } catch (error) {
+      console.error("Failed to create Mailtrap transporter:", error);
+      return null;
+    }
+  }
+
+  // provider === "gmail" (default)
+  const missing = [];
+  if (!gmailUser) missing.push("GMAIL_USER");
+  if (!gmailPass) missing.push("GMAIL_APP_PASSWORD");
+
+  if (missing.length) {
     console.error(
       `Gmail credentials are missing: ${missing.join(", ")}. OTP emails will not be sent.`
     );
     return null;
   }
 
+  const gmailPassValue = gmailPass as string;
+
+  if (gmailPassValue.length !== 16) {
+    console.warn(
+      "GMAIL_APP_PASSWORD length does not look like a Gmail App Password (expected 16 characters after removing spaces).",
+      { length: gmailPassValue.length }
+    );
+  }
+
   try {
     const transport = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465, // true for 465, false for other ports (587 uses STARTTLS)
-      auth: { 
-        user, 
-        pass 
+      host: gmailHost,
+      port: gmailPort,
+      secure: gmailPort === 465, // true for 465, false for other ports (587 uses STARTTLS)
+      auth: {
+        user: gmailUser,
+        pass: gmailPassValue,
       },
       tls: {
         // Do not fail on invalid certs
         rejectUnauthorized: false,
       },
     });
-    
+
     // Log configuration (without sensitive data)
     console.log("Gmail SMTP transporter created", {
-      host,
-      port,
-      secure: port === 465,
-      user: user ? `${user.substring(0, 3)}***` : "missing",
+      host: gmailHost,
+      port: gmailPort,
+      secure: gmailPort === 465,
+      user: gmailUser ? `${gmailUser.substring(0, 3)}***` : "missing",
     });
-    
+
     return transport;
   } catch (error) {
-    console.error("Failed to create email transporter:", error);
+    console.error("Failed to create Gmail transporter:", error);
     return null;
   }
 })();
@@ -66,17 +135,15 @@ export const sendOtpEmail = async ({
   expiresInMinutes,
 }: OtpEmailPayload) => {
   if (!transporter) {
-    const missing = [];
-    if (!process.env.GMAIL_USER) missing.push("GMAIL_USER");
-    if (!process.env.GMAIL_APP_PASSWORD) missing.push("GMAIL_APP_PASSWORD");
-    
     throw new Error(
-      `Email service is not configured. Missing environment variables: ${missing.join(", ")}. Please set these in your .env file.`
+      "Email service is not configured. Set Gmail vars (GMAIL_USER/GMAIL_APP_PASSWORD) or set EMAIL_PROVIDER=mailtrap with MAILTRAP_HOST/MAILTRAP_USER/MAILTRAP_PASS."
     );
   }
 
   const from =
-    process.env.GMAIL_FROM || process.env.GMAIL_USER || "HomeConnect <no-reply@homeconnect.com>";
+    normalizeEnvValue(process.env.GMAIL_FROM) ||
+    gmailUser ||
+    "HomeConnect <no-reply@homeconnect.com>";
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
@@ -94,8 +161,9 @@ export const sendOtpEmail = async ({
     console.log(`Attempting to send OTP email to: ${to}`);
     console.log(`Email configuration:`, {
       from,
-      host: process.env.GMAIL_HOST || "smtp.gmail.com",
-      port: process.env.GMAIL_PORT || 587,
+      provider: emailProvider,
+      host: emailProvider === "mailtrap" ? mailtrapHost : gmailHost,
+      port: emailProvider === "mailtrap" ? mailtrapPort : gmailPort,
     });
     
     // Verify connection before sending
@@ -103,11 +171,19 @@ export const sendOtpEmail = async ({
       await transporter.verify();
       console.log("Gmail SMTP connection verified successfully");
     } catch (verifyError) {
+      const verifyCode = (verifyError as any)?.code;
+      const verifyMessage = verifyError instanceof Error ? verifyError.message : String(verifyError);
       console.error("Gmail SMTP connection verification failed:", verifyError);
+
+      // Gmail login failures show up as 535 / EAUTH.
+      if (emailProvider === "gmail" && (verifyCode === "EAUTH" || /\b535\b/.test(verifyMessage))) {
+        throw new Error(
+          "Gmail authentication failed (535). Use a NEW Gmail App Password (not your normal password), and ensure it matches the same Gmail account as GMAIL_USER. After editing env vars, restart the dev server."
+        );
+      }
+
       throw new Error(
-        `Cannot connect to Gmail SMTP server. Please check your Gmail credentials. Error: ${
-          verifyError instanceof Error ? verifyError.message : String(verifyError)
-        }`
+        `Cannot verify SMTP connection. Check provider credentials and network access. Error: ${verifyMessage}`
       );
     }
     
@@ -159,17 +235,13 @@ export const sendPasswordResetEmail = async ({
   expiresInMinutes,
 }: PasswordResetEmailPayload) => {
   if (!transporter) {
-    const missing = [];
-    if (!process.env.GMAIL_USER) missing.push("GMAIL_USER");
-    if (!process.env.GMAIL_APP_PASSWORD) missing.push("GMAIL_APP_PASSWORD");
-    
     throw new Error(
-      `Email service is not configured. Missing environment variables: ${missing.join(", ")}. Please set these in your .env file.`
+      "Email service is not configured. Set Gmail vars (GMAIL_USER/GMAIL_APP_PASSWORD) or set EMAIL_PROVIDER=mailtrap with MAILTRAP_HOST/MAILTRAP_USER/MAILTRAP_PASS."
     );
   }
 
   const from =
-    process.env.GMAIL_FROM || process.env.GMAIL_USER || "HomeConnect <no-reply@homeconnect.com>";
+    normalizeEnvValue(process.env.GMAIL_FROM) || gmailUser || "HomeConnect <no-reply@homeconnect.com>";
 
   const html = `
     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #0f172a;">
@@ -187,20 +259,28 @@ export const sendPasswordResetEmail = async ({
     console.log(`Attempting to send password reset email to: ${to}`);
     console.log(`Email configuration:`, {
       from,
-      host: process.env.GMAIL_HOST || "smtp.gmail.com",
-      port: process.env.GMAIL_PORT || 587,
+      provider: emailProvider,
+      host: emailProvider === "mailtrap" ? mailtrapHost : gmailHost,
+      port: emailProvider === "mailtrap" ? mailtrapPort : gmailPort,
     });
     
     // Verify connection before sending
     try {
       await transporter.verify();
-      console.log("Gmail SMTP connection verified successfully");
+      console.log("SMTP connection verified successfully");
     } catch (verifyError) {
-      console.error("Gmail SMTP connection verification failed:", verifyError);
+      const verifyCode = (verifyError as any)?.code;
+      const verifyMessage = verifyError instanceof Error ? verifyError.message : String(verifyError);
+      console.error("SMTP connection verification failed:", verifyError);
+
+      if (emailProvider === "gmail" && (verifyCode === "EAUTH" || /\b535\b/.test(verifyMessage))) {
+        throw new Error(
+          "Gmail authentication failed (535). Use a NEW Gmail App Password (not your normal password), and ensure it matches the same Gmail account as GMAIL_USER. After editing env vars, restart the dev server."
+        );
+      }
+
       throw new Error(
-        `Cannot connect to Gmail SMTP server. Please check your Gmail credentials. Error: ${
-          verifyError instanceof Error ? verifyError.message : String(verifyError)
-        }`
+        `Cannot verify SMTP connection. Check provider credentials and network access. Error: ${verifyMessage}`
       );
     }
     

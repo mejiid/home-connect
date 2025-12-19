@@ -14,6 +14,8 @@ To enable password reset emails, you need to configure Gmail SMTP credentials.
 5. Click **Generate**
 6. Copy the 16-character password (it will look like: `abcd efgh ijkl mnop`)
 
+Important: when you paste it into `.env.local`, remove the spaces (or wrap it in quotes). This project also strips spaces automatically, but it's best to store it cleanly.
+
 ## Step 2: Create .env.local file
 
 Create a file named `.env.local` in the root of your project with the following content:
@@ -31,6 +33,8 @@ GMAIL_FROM=HomeConnect <your-email@gmail.com>
 - Replace `your-email@gmail.com` with your actual Gmail address
 - Replace `your-16-character-app-password-here` with the App Password you generated (remove spaces)
 - Use the App Password, NOT your regular Gmail password
+
+Note: avoid inline comments after values in `.env` / `.env.local` (e.g. `GMAIL_PORT=587 # comment`). Some setups treat that `# comment` as part of the value.
 
 ## Step 3: Restart Your Development Server
 

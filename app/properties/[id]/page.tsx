@@ -1,7 +1,18 @@
 import React from "react";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { MapPin, Share, Heart, Phone, Mail, Check } from "lucide-react";
+import {
+  MapPin,
+  Share,
+  Heart,
+  Phone,
+  Mail,
+  Check,
+  Home,
+  BedDouble,
+  Bath,
+  Ruler,
+} from "lucide-react";
 import db from "@/lib/db";
 import { Property } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -38,24 +49,15 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-zinc-900 mb-2">{property.title}</h1>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-zinc-600 underline cursor-pointer">
-              <MapPin className="w-4 h-4" />
-              <span>
-                {property.city}, {property.kebele ? `${property.kebele}, ` : ""}
-                {property.woreda}
-              </span>
-            </div>
-            <div className="flex items-center gap-4">
-              <button className="flex items-center gap-2 text-zinc-900 hover:bg-zinc-100 px-3 py-2 rounded-lg transition-colors">
-                <Share className="w-4 h-4" />
-                <span className="underline font-medium">Share</span>
-              </button>
-              <button className="flex items-center gap-2 text-zinc-900 hover:bg-zinc-100 px-3 py-2 rounded-lg transition-colors">
-                <Heart className="w-4 h-4" />
-                <span className="underline font-medium">Save</span>
-              </button>
-            </div>
+          <div className="flex items-center justify-end gap-4">
+            <button className="flex items-center gap-2 text-zinc-900 hover:bg-zinc-100 px-3 py-2 rounded-lg transition-colors">
+              <Share className="w-4 h-4" />
+              <span className="underline font-medium">Share</span>
+            </button>
+            <button className="flex items-center gap-2 text-zinc-900 hover:bg-zinc-100 px-3 py-2 rounded-lg transition-colors">
+              <Heart className="w-4 h-4" />
+              <span className="underline font-medium">Save</span>
+            </button>
           </div>
         </div>
 
@@ -113,21 +115,67 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-8">
-            <div className="flex justify-between items-center border-b border-zinc-200 pb-6">
-              <div>
-                <h2 className="text-2xl font-semibold text-zinc-900 mb-1">
-                  {property.type} hosted by {property.ownerName}
-                </h2>
-                <div className="flex items-center gap-4 text-zinc-600">
-                  {property.bedrooms && <span>{property.bedrooms} bedrooms</span>}
-                  <span>·</span>
-                  {property.bathrooms && <span>{property.bathrooms} baths</span>}
-                  <span>·</span>
-                  {property.area && <span>{property.area} m²</span>}
+            <div className="space-y-2 border-b border-zinc-200 pb-6">
+              <h2 className="text-xl font-semibold text-zinc-900">Location</h2>
+              <div className="flex items-start gap-2 text-zinc-600">
+                <MapPin className="w-4 h-4 mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <div>{property.city}</div>
+                  {property.kebele && <div>Kebele: {property.kebele}</div>}
+                  <div>Woreda: {property.woreda}</div>
                 </div>
               </div>
-              <div className="h-12 w-12 bg-zinc-900 rounded-full flex items-center justify-center text-white font-bold text-xl">
-                {property.ownerName.charAt(0).toUpperCase()}
+            </div>
+
+            <div className="border-b border-zinc-200 pb-6">
+              <h2 className="text-xl font-semibold text-zinc-900 mb-4">What this place offers</h2>
+              <div className="flex flex-col gap-4">
+                {property.water === 1 && (
+                  <div className="flex items-center gap-3 text-zinc-600">
+                    <Check className="w-5 h-5" />
+                    <span>Water Supply</span>
+                  </div>
+                )}
+                {property.electricity && (
+                  <div className="flex items-center gap-3 text-zinc-600">
+                    <Check className="w-5 h-5" />
+                    <span>Electricity ({property.electricity})</span>
+                  </div>
+                )}
+                {property.condition && (
+                  <div className="flex items-center gap-3 text-zinc-600">
+                    <Check className="w-5 h-5" />
+                    <span>Condition: {property.condition}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="border-b border-zinc-200 pb-6">
+              <h2 className="text-2xl font-semibold text-zinc-900 mb-3">Home Futures</h2>
+              <div className="flex flex-col gap-1 text-zinc-600">
+                <div className="flex items-center gap-2">
+                  <Home className="w-4 h-4 shrink-0" />
+                  <span>{property.type}</span>
+                </div>
+                {property.bedrooms ? (
+                  <div className="flex items-center gap-2">
+                    <BedDouble className="w-4 h-4 shrink-0" />
+                    <span>{property.bedrooms} bedrooms</span>
+                  </div>
+                ) : null}
+                {property.bathrooms ? (
+                  <div className="flex items-center gap-2">
+                    <Bath className="w-4 h-4 shrink-0" />
+                    <span>{property.bathrooms} baths</span>
+                  </div>
+                ) : null}
+                {property.area ? (
+                  <div className="flex items-center gap-2">
+                    <Ruler className="w-4 h-4 shrink-0" />
+                    <span>{property.area} m²</span>
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -166,30 +214,6 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
               <p className="text-zinc-600 leading-relaxed whitespace-pre-line">
                 {property.description || "No description provided."}
               </p>
-            </div>
-
-            <div className="border-b border-zinc-200 pb-6">
-              <h2 className="text-xl font-semibold text-zinc-900 mb-4">What this place offers</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {property.water === 1 && (
-                  <div className="flex items-center gap-3 text-zinc-600">
-                    <Check className="w-5 h-5" />
-                    <span>Water Supply</span>
-                  </div>
-                )}
-                {property.electricity && (
-                  <div className="flex items-center gap-3 text-zinc-600">
-                    <Check className="w-5 h-5" />
-                    <span>Electricity ({property.electricity})</span>
-                  </div>
-                )}
-                {property.condition && (
-                  <div className="flex items-center gap-3 text-zinc-600">
-                    <Check className="w-5 h-5" />
-                    <span>Condition: {property.condition}</span>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
