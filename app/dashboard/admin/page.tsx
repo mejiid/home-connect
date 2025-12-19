@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { authClient } from "@/lib/client";
+import { FilePreviewModal } from "@/components/file-preview-modal";
 
 type Agent = {
   id: string;
@@ -31,6 +32,8 @@ type Submission = {
   identityDocumentUrl: string;
   homeMapUrl: string;
   status: "pending" | "accepted" | "rejected";
+  statusUpdatedByEmail?: string | null;
+  statusUpdatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
   email: string;
@@ -66,6 +69,22 @@ const AdminDashboardPage = () => {
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"agents" | "submissions">("agents");
+
+  // Preview Modal State (mirrors agent dashboard behavior)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState("");
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const openPreview = (url: unknown, title: string) => {
+    const normalizedUrl = typeof url === "string" ? url.trim() : "";
+    if (!normalizedUrl) {
+      return;
+    }
+
+    setPreviewUrl(normalizedUrl);
+    setPreviewTitle(title);
+    setIsPreviewOpen(true);
+  };
 
   const fetchAgents = useCallback(async () => {
     setAgentsLoading(true);
@@ -315,7 +334,12 @@ const AdminDashboardPage = () => {
       if (response.ok) {
         await fetchSubmissions();
         if (selectedSubmission?.id === id) {
-          setSelectedSubmission({ ...selectedSubmission, status: newStatus });
+          setSelectedSubmission({
+            ...selectedSubmission,
+            status: newStatus,
+            statusUpdatedByEmail: session?.user?.email ?? selectedSubmission.statusUpdatedByEmail,
+            statusUpdatedAt: new Date().toISOString(),
+          });
         }
       }
     } catch (error) {
@@ -325,20 +349,20 @@ const AdminDashboardPage = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, statusUpdatedByEmail?: string | null) => {
     switch (status) {
       case "accepted":
         return (
           <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
             <CheckCircle2 className="h-3 w-3 mr-1" />
-            Accepted
+            {statusUpdatedByEmail ? `Accepted by ${statusUpdatedByEmail}` : "Accepted"}
           </span>
         );
       case "rejected":
         return (
           <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
             <XCircle className="h-3 w-3 mr-1" />
-            Rejected
+            {statusUpdatedByEmail ? `Rejected by ${statusUpdatedByEmail}` : "Rejected"}
           </span>
         );
       default:
@@ -587,7 +611,7 @@ const AdminDashboardPage = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <span className="font-semibold">{submission.fullName}</span>
-                              {getStatusBadge(submission.status)}
+                              {getStatusBadge(submission.status, submission.statusUpdatedByEmail)}
                             </div>
                             <p className="text-sm text-zinc-600 mb-1">
                               {submission.email} • {submission.woreda}, {submission.kebele}, {submission.village}
@@ -667,7 +691,7 @@ const AdminDashboardPage = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <span className="font-semibold">{submission.fullName}</span>
-                              {getStatusBadge(submission.status)}
+                              {getStatusBadge(submission.status, submission.statusUpdatedByEmail)}
                             </div>
                             <p className="text-sm text-zinc-600 mb-1">
                               {submission.email} • {submission.woreda}, {submission.kebele}, {submission.village}
@@ -739,7 +763,7 @@ const AdminDashboardPage = () => {
                   <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
                     {selectedSubmission.type === "sell" ? "Sell" : "Lessor"}
                   </span>
-                  {getStatusBadge(selectedSubmission.status)}
+                  {getStatusBadge(selectedSubmission.status, selectedSubmission.statusUpdatedByEmail)}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -771,28 +795,34 @@ const AdminDashboardPage = () => {
 
                 <div>
                   <label className="text-sm font-medium text-zinc-600 mb-2 block">Identity Document</label>
-                  <a
-                    href={selectedSubmission.identityDocumentUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline flex items-center gap-2"
-                  >
-                    <FileText className="h-4 w-4" />
-                    View Document
-                  </a>
+                  {typeof selectedSubmission.identityDocumentUrl === "string" && selectedSubmission.identityDocumentUrl.trim() ? (
+                    <Button
+                      variant="link"
+                      className="px-0 text-blue-600 h-auto font-normal hover:no-underline hover:text-blue-700 flex items-center gap-2"
+                      onClick={() => openPreview(selectedSubmission.identityDocumentUrl, "Identity Document")}
+                    >
+                      <FileText className="h-4 w-4" />
+                      View Document
+                    </Button>
+                  ) : (
+                    <p className="text-sm text-zinc-500">Not provided</p>
+                  )}
                 </div>
 
                 <div>
                   <label className="text-sm font-medium text-zinc-600 mb-2 block">Government Home Map</label>
-                  <a
-                    href={selectedSubmission.homeMapUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline flex items-center gap-2"
-                  >
-                    <Map className="h-4 w-4" />
-                    View Map
-                  </a>
+                  {typeof selectedSubmission.homeMapUrl === "string" && selectedSubmission.homeMapUrl.trim() ? (
+                    <Button
+                      variant="link"
+                      className="px-0 text-blue-600 h-auto font-normal hover:no-underline hover:text-blue-700 flex items-center gap-2"
+                      onClick={() => openPreview(selectedSubmission.homeMapUrl, "Government Home Map")}
+                    >
+                      <Map className="h-4 w-4" />
+                      View Map
+                    </Button>
+                  ) : (
+                    <p className="text-sm text-zinc-500">Not provided</p>
+                  )}
                 </div>
 
                 {selectedSubmission.status === "pending" && (
@@ -832,6 +862,14 @@ const AdminDashboardPage = () => {
             </div>
           </div>
         )}
+
+        {/* File Preview Modal */}
+        <FilePreviewModal
+          isOpen={isPreviewOpen}
+          onClose={() => setIsPreviewOpen(false)}
+          url={previewUrl}
+          title={previewTitle}
+        />
       </div>
     </div>
   );

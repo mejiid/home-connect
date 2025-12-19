@@ -266,12 +266,18 @@ const SellPage = () => {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({
           ...formData,
           identityDocumentUrl,
           homeMapUrl,
         }),
       });
+
+      if (response.status === 401) {
+        router.push("/signin");
+        return;
+      }
 
       if (!response.ok) {
         let errorMessage = "Failed to submit form";
@@ -299,23 +305,7 @@ const SellPage = () => {
       console.log("Submission successful:", result);
 
       setSubmitSuccess(true);
-      // Reset form
-      setFormData({
-        fullName: session?.user?.name || "",
-        phoneNumber: "",
-        woreda: "",
-        kebele: "",
-        village: "",
-      });
-      setIdentityDocument(null);
-      setHomeMap(null);
-      setIdentityDocumentUrl("");
-      setHomeMapUrl("");
-
-      // Reset success message after 5 seconds
-      setTimeout(() => {
-        setSubmitSuccess(false);
-      }, 5000);
+      router.push("/dashboard");
     } catch (error: any) {
       setErrors((prev) => ({
         ...prev,

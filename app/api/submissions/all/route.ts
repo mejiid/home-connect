@@ -29,9 +29,12 @@ export async function GET(request: Request) {
         `SELECT s.id, s."userId", s."fullName", s."phoneNumber", s.woreda, 
          s.kebele, s.village, s."identityDocumentUrl", s."homeMapUrl", 
          s.status, s."createdAt", s."updatedAt",
-         u.email, u.name as "userName"
+         s."statusUpdatedByUserId", s."statusUpdatedAt",
+         u.email, u.name as "userName",
+         reviewer.email as "statusUpdatedByEmail"
          FROM "sell_submission" s
          JOIN "user" u ON s."userId" = u.id
+         LEFT JOIN "user" reviewer ON reviewer.id = s."statusUpdatedByUserId"
          ORDER BY s."createdAt" DESC`
       )
       .all() as Array<{
@@ -47,8 +50,11 @@ export async function GET(request: Request) {
       status: string;
       createdAt: string;
       updatedAt: string;
+      statusUpdatedByUserId?: string | null;
+      statusUpdatedAt?: string | null;
       email: string;
       userName: string | null;
+      statusUpdatedByEmail?: string | null;
     }>;
 
     // Get lessor submissions with user info
@@ -57,9 +63,12 @@ export async function GET(request: Request) {
         `SELECT s.id, s."userId", s."fullName", s."phoneNumber", s.woreda, 
          s.kebele, s.village, s."identityDocumentUrl", s."homeMapUrl", 
          s.status, s."createdAt", s."updatedAt",
-         u.email, u.name as "userName"
+         s."statusUpdatedByUserId", s."statusUpdatedAt",
+         u.email, u.name as "userName",
+         reviewer.email as "statusUpdatedByEmail"
          FROM "lessor_submission" s
          JOIN "user" u ON s."userId" = u.id
+         LEFT JOIN "user" reviewer ON reviewer.id = s."statusUpdatedByUserId"
          ORDER BY s."createdAt" DESC`
       )
       .all() as Array<{
@@ -75,8 +84,11 @@ export async function GET(request: Request) {
       status: string;
       createdAt: string;
       updatedAt: string;
+      statusUpdatedByUserId?: string | null;
+      statusUpdatedAt?: string | null;
       email: string;
       userName: string | null;
+      statusUpdatedByEmail?: string | null;
     }>;
 
     return NextResponse.json({

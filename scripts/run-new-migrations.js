@@ -16,6 +16,12 @@ const migration2File = path.join(
   "../better-auth_migrations/2025-01-16T01-00-00.000Z.sql"
 );
 
+// Migration 3: Add status audit columns (who updated status + when)
+const migration3File = path.join(
+  __dirname,
+  "../better-auth_migrations/2025-12-19T00-00-00.000Z.sql"
+);
+
 try {
   // Check if status column exists
   const columns = db
@@ -44,6 +50,35 @@ try {
     console.log("✓ Migration 2 executed: Created lessor_submission table");
   } else {
     console.log("✓ Migration 2: lessor_submission table already exists");
+  }
+
+  // Check if status audit columns exist (sell_submission)
+  const sellColumns = db.prepare("PRAGMA table_info(sell_submission)").all();
+  const hasSellAudit = sellColumns.some(
+    (col) => col.name === "statusUpdatedByUserId"
+  );
+
+  // Check if status audit columns exist (lessor_submission) if the table exists
+  const lessorTableExists = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='lessor_submission'"
+    )
+    .get();
+  const lessorColumns = lessorTableExists
+    ? db.prepare("PRAGMA table_info(lessor_submission)").all()
+    : [];
+  const hasLessorAudit = lessorColumns.some(
+    (col) => col.name === "statusUpdatedByUserId"
+  );
+
+  if (!hasSellAudit || (lessorTableExists && !hasLessorAudit)) {
+    const migration3SQL = fs.readFileSync(migration3File, "utf-8");
+    db.exec(migration3SQL);
+    console.log(
+      "✓ Migration 3 executed: Added status audit columns to submission tables"
+    );
+  } else {
+    console.log("✓ Migration 3: status audit columns already exist");
   }
 } catch (error) {
   console.error("Migration failed:", error);

@@ -54,4 +54,39 @@ function ensurePropertiesSchema() {
 
 ensurePropertiesSchema();
 
+function ensureSubmissionStatusAuditColumns(tableName: "sell_submission" | "lessor_submission") {
+	const tableExists = db
+		.prepare(
+			"SELECT name FROM sqlite_master WHERE type='table' AND name=?"
+		)
+		.get(tableName);
+
+	if (!tableExists) {
+		return;
+	}
+
+	const columns = db
+		.prepare(`PRAGMA table_info(${tableName})`)
+		.all() as Array<{ name: string }>;
+
+	const hasStatusUpdatedByUserId = columns.some(
+		(col) => col.name === "statusUpdatedByUserId"
+	);
+	if (!hasStatusUpdatedByUserId) {
+		db.exec(
+			`ALTER TABLE "${tableName}" ADD COLUMN "statusUpdatedByUserId" TEXT`
+		);
+	}
+
+	const hasStatusUpdatedAt = columns.some(
+		(col) => col.name === "statusUpdatedAt"
+	);
+	if (!hasStatusUpdatedAt) {
+		db.exec(`ALTER TABLE "${tableName}" ADD COLUMN "statusUpdatedAt" TEXT`);
+	}
+}
+
+ensureSubmissionStatusAuditColumns("sell_submission");
+ensureSubmissionStatusAuditColumns("lessor_submission");
+
 export default db;

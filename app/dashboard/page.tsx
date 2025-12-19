@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -36,24 +36,32 @@ type Submission = {
   identityDocumentUrl: string;
   homeMapUrl: string;
   status: "pending" | "accepted" | "rejected";
+  statusUpdatedByEmail?: string | null;
+  statusUpdatedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
 
-const getStatusBadge = (status: string) => {
+const compareByCreatedAtDesc = (a: Submission, b: Submission) => {
+  const aTime = Date.parse(a.createdAt);
+  const bTime = Date.parse(b.createdAt);
+  return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+};
+
+const getStatusBadge = (status: string, statusUpdatedByEmail?: string | null) => {
   switch (status) {
     case "accepted":
       return (
         <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
           <CheckCircle2 className="h-3 w-3 mr-1" />
-          Accepted
+          {statusUpdatedByEmail ? `Accepted by ${statusUpdatedByEmail}` : "Accepted"}
         </span>
       );
     case "rejected":
       return (
         <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
           <XCircle className="h-3 w-3 mr-1" />
-          Rejected
+          {statusUpdatedByEmail ? `Rejected by ${statusUpdatedByEmail}` : "Rejected"}
         </span>
       );
     default:
@@ -80,9 +88,46 @@ export default function DashboardPage() {
   const { data: session, isPending } = authClient.useSession();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submissionsError, setSubmissionsError] = useState<string | null>(null);
   const [roleChecked, setRoleChecked] = useState(false);
   const [role, setRole] = useState<string | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
+
+  const fetchSubmissions = useCallback(async () => {
+    setLoading(true);
+    setSubmissionsError(null);
+    try {
+      const response = await fetch("/api/submissions/my", {
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (response.status === 401) {
+        router.push("/signin");
+        return;
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        const allSubmissions = [...data.sell, ...data.lessor].sort(compareByCreatedAtDesc);
+        setSubmissions(allSubmissions as Submission[]);
+      } else {
+        let message = `Failed to load submissions (${response.status})`;
+        try {
+          const err = await response.json();
+          if (err?.error) message = `${String(err.error)} (${response.status})`;
+        } catch {
+          // ignore
+        }
+        setSubmissionsError(message);
+      }
+    } catch (error) {
+      console.error("Failed to fetch submissions:", error);
+      setSubmissionsError("Failed to load submissions");
+    } finally {
+      setLoading(false);
+    }
+  }, [router]);
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -144,24 +189,7 @@ export default function DashboardPage() {
       isMounted = false;
       controller.abort();
     };
-  }, [session?.user, router]);
-
-  const fetchSubmissions = async () => {
-    try {
-      const response = await fetch("/api/submissions/my", {
-        credentials: "include",
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const allSubmissions = [...data.sell, ...data.lessor];
-        setSubmissions(allSubmissions);
-      }
-    } catch (error) {
-      console.error("Failed to fetch submissions:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [session?.user, router, fetchSubmissions]);
 
   if (isPending || loading || (session?.user && !roleChecked)) {
     return (
@@ -220,6 +248,11 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {submissionsError ? (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+                  {submissionsError}
+                </div>
+              ) : null}
               {submissions.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="h-12 w-12 text-zinc-400 mx-auto mb-4" />
@@ -248,7 +281,7 @@ export default function DashboardPage() {
                             <h3 className="font-semibold text-lg text-zinc-900">
                               {submission.type === "sell" ? "Sell" : "Lessor"} Submission
                             </h3>
-                            {getStatusBadge(submission.status)}
+                            {getStatusBadge(submission.status, submission.statusUpdatedByEmail)}
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-sm text-zinc-600 mb-3">
                             <div className="flex items-center gap-2">
@@ -367,7 +400,7 @@ export default function DashboardPage() {
                 <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
                   {selectedSubmission.type === "sell" ? "Sell" : "Lessor"}
                 </span>
-                {getStatusBadge(selectedSubmission.status)}
+                {getStatusBadge(selectedSubmission.status, selectedSubmission.statusUpdatedByEmail)}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

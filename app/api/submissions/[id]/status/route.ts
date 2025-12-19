@@ -52,11 +52,11 @@ export async function PATCH(
     // Update status
     const updateStmt = db.prepare(
       `UPDATE "${tableName}" 
-       SET status = ?, "updatedAt" = ? 
+       SET status = ?, "updatedAt" = ?, "statusUpdatedByUserId" = ?, "statusUpdatedAt" = ? 
        WHERE id = ?`
     );
 
-    const result = updateStmt.run(status, timestamp, id);
+     const result = updateStmt.run(status, timestamp, session.userId, timestamp, id);
 
     if (result.changes === 0) {
       return NextResponse.json(
