@@ -54,6 +54,11 @@ const AgentDashboardPage = () => {
 
   const [isCheckingRole, setIsCheckingRole] = useState(true);
   const [isAgent, setIsAgent] = useState(false);
+  const [stats, setStats] = useState<{ activeListings: number; clients: number }>({
+    activeListings: 0,
+    clients: 0,
+  });
+  const [statsLoading, setStatsLoading] = useState(false);
   const [submissions, setSubmissions] = useState<{ sell: Submission[]; lessor: Submission[] }>({ sell: [], lessor: [] });
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
@@ -68,6 +73,34 @@ const AgentDashboardPage = () => {
     setPreviewUrl(url);
     setPreviewTitle(title);
     setIsPreviewOpen(true);
+  };
+
+  const fetchStats = async () => {
+    setStatsLoading(true);
+    try {
+      const response = await fetch("/api/agent/stats", {
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      const data = (await response.json()) as {
+        activeListings?: number;
+        clients?: number;
+      };
+
+      setStats({
+        activeListings: Number(data.activeListings ?? 0),
+        clients: Number(data.clients ?? 0),
+      });
+    } catch (error) {
+      console.error("Failed to fetch agent stats:", error);
+    } finally {
+      setStatsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -119,6 +152,7 @@ const AgentDashboardPage = () => {
         }
 
         fetchSubmissions();
+        fetchStats();
       } catch (error) {
         console.error("Failed to resolve role", error);
         if (isMounted) {
@@ -169,6 +203,7 @@ const AgentDashboardPage = () => {
 
       if (response.ok) {
         await fetchSubmissions();
+        await fetchStats();
         if (selectedSubmission?.id === id) {
           setSelectedSubmission({
             ...selectedSubmission,
@@ -270,7 +305,7 @@ const AgentDashboardPage = () => {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -284,7 +319,9 @@ const AgentDashboardPage = () => {
                   <Home className="h-4 w-4 text-blue-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-zinc-900">0</div>
+                  <div className="text-2xl font-bold text-zinc-900">
+                    {statsLoading ? "…" : stats.activeListings}
+                  </div>
                   <p className="text-xs text-zinc-500 mt-1">
                     Properties you&apos;re managing
                   </p>
@@ -305,30 +342,11 @@ const AgentDashboardPage = () => {
                   <Users className="h-4 w-4 text-green-600" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-zinc-900">0</div>
+                  <div className="text-2xl font-bold text-zinc-900">
+                    {statsLoading ? "…" : stats.clients}
+                  </div>
                   <p className="text-xs text-zinc-500 mt-1">
                     Active client relationships
-                  </p>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              <Card className="border-zinc-200/60 shadow-lg">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-zinc-600">
-                    Documents
-                  </CardTitle>
-                  <FileText className="h-4 w-4 text-purple-600" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold text-zinc-900">0</div>
-                  <p className="text-xs text-zinc-500 mt-1">
-                    Pending documents
                   </p>
                 </CardContent>
               </Card>
