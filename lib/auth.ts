@@ -16,6 +16,11 @@ export const auth = betterAuth({
         defaultValue: "user",
         input: false, // don't allow user to set role
       },
+      phone: {
+        type: "string",
+        required: false,
+        input: false, // managed by admin for agents
+      },
     },
   },
   socialProviders: {

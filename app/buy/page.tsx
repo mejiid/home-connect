@@ -3,10 +3,67 @@ import db from "@/lib/db";
 import { Property } from "@/types";
 import { PropertyCard } from "@/components/property-card";
 
-const Buy = () => {
-  const properties = db
-    .prepare("SELECT * FROM properties WHERE status = 'Available' AND listingType = 'sell'")
-    .all() as Property[];
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function normalizeSingleParam(value: string | string[] | undefined) {
+  if (Array.isArray(value)) {
+    return value[0];
+  }
+  return value;
+}
+
+function parseNumberParam(value: string | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+const Buy = ({
+  searchParams,
+}: {
+  searchParams?: SearchParams;
+}) => {
+  const location = normalizeSingleParam(searchParams?.location)?.trim();
+  const propertyType = normalizeSingleParam(searchParams?.type)?.trim();
+  const minPrice = parseNumberParam(
+    normalizeSingleParam(searchParams?.minPrice)?.trim()
+  );
+  const maxPrice = parseNumberParam(
+    normalizeSingleParam(searchParams?.maxPrice)?.trim()
+  );
+
+  const conditions: string[] = [
+    "status = 'Available'",
+    "listingType = 'sell'",
+  ];
+  const params: Array<string | number> = [];
+
+  if (location) {
+    conditions.push("(lower(city) LIKE lower(?) OR lower(title) LIKE lower(?))");
+    const like = `%${location}%`;
+    params.push(like, like);
+  }
+
+  if (propertyType) {
+    conditions.push("lower(type) = lower(?)");
+    params.push(propertyType);
+  }
+
+  if (minPrice !== null) {
+    conditions.push("price >= ?");
+    params.push(minPrice);
+  }
+
+  if (maxPrice !== null) {
+    conditions.push("price <= ?");
+    params.push(maxPrice);
+  }
+
+  const sql = `SELECT * FROM properties WHERE ${conditions.join(" AND ")}`;
+  const properties = db.prepare(sql).all(...params) as Property[];
 
   return (
     <div className="min-h-screen bg-white p-8">

@@ -11,6 +11,15 @@ import { getSessionWithRole } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
+const userHasPhoneColumn = () => {
+  const columns = db.prepare('PRAGMA table_info("user")').all() as Array<{
+    name: string;
+  }>;
+  return columns.some((column) => column.name === "phone");
+};
+
+const normalizePhoneDigits = (value: string) => value.replace(/\D/g, "");
+
 const unauthorizedResponse = NextResponse.json(
   { message: "Not authorized" },
   { status: 403 }
@@ -33,14 +42,19 @@ export async function GET(request: Request) {
     return unauthorizedResponse;
   }
 
+  const includePhone = userHasPhoneColumn();
+
   const agents = db
     .prepare(
-      'SELECT id, email, name, role, createdAt, updatedAt FROM "user" WHERE lower(role) = lower(?) ORDER BY datetime(createdAt) DESC'
+      includePhone
+        ? 'SELECT id, email, name, phone, role, createdAt, updatedAt FROM "user" WHERE lower(role) = lower(?) ORDER BY datetime(createdAt) DESC'
+        : 'SELECT id, email, name, role, createdAt, updatedAt FROM "user" WHERE lower(role) = lower(?) ORDER BY datetime(createdAt) DESC'
     )
     .all(AGENT_ROLE) as {
     id: string;
     email: string;
     name: string;
+    phone?: string | null;
     role: string | null;
     createdAt: string;
     updatedAt: string;
@@ -57,13 +71,33 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body = (await request.json()) as { email?: string };
+    const body = (await request.json()) as {
+      email?: string;
+      name?: string;
+      phone?: string;
+    };
     const email = body.email?.trim().toLowerCase();
+    const agentName = body.name?.trim();
+    const agentPhone = body.phone?.trim();
 
     // Validate email is provided
     if (!email) {
       return NextResponse.json(
         { message: "Email is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!agentName) {
+      return NextResponse.json(
+        { message: "Agent name is required" },
+        { status: 400 }
+      );
+    }
+
+    if (!agentPhone) {
+      return NextResponse.json(
+        { message: "Agent phone number is required" },
         { status: 400 }
       );
     }
@@ -77,13 +111,38 @@ export async function POST(request: Request) {
       );
     }
 
+    const phoneDigits = normalizePhoneDigits(agentPhone);
+    if (phoneDigits.length < 7) {
+      return NextResponse.json(
+        { message: "Please provide a valid phone number" },
+        { status: 400 }
+      );
+    }
+
+    const includePhone = userHasPhoneColumn();
+    if (!includePhone) {
+      return NextResponse.json(
+        {
+          message:
+            "Database is missing user.phone column. Run migrations then try again.",
+        },
+        { status: 500 }
+      );
+    }
+
     // Check if user exists in database
     const user = db
       .prepare(
-        'SELECT id, email, name, role FROM "user" WHERE lower(email) = lower(?)'
+        'SELECT id, email, name, phone, role FROM "user" WHERE lower(email) = lower(?)'
       )
       .get(email) as
-      | { id: string; email: string; name: string; role?: string | null }
+      | {
+          id: string;
+          email: string;
+          name: string;
+          phone?: string | null;
+          role?: string | null;
+        }
       | undefined;
 
     // If user doesn't exist, return error
@@ -105,19 +164,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // If already an agent, return success message
-    if (currentRole === AGENT_ROLE) {
-      return NextResponse.json(
-        { message: `${user.email} is already an agent` },
-        { status: 200 }
-      );
-    }
+    const shouldUpdateRole = currentRole !== AGENT_ROLE;
 
-    // Update user role to agent
+    // Update user fields (role + name + phone)
     const now = new Date().toISOString();
     const updateResult = db
-      .prepare('UPDATE "user" SET role = ?, updatedAt = ? WHERE id = ?')
-      .run(AGENT_ROLE, now, user.id);
+      .prepare(
+        shouldUpdateRole
+          ? 'UPDATE "user" SET role = ?, name = ?, phone = ?, updatedAt = ? WHERE id = ?'
+          : 'UPDATE "user" SET name = ?, phone = ?, updatedAt = ? WHERE id = ?'
+      )
+      .run(
+        ...(shouldUpdateRole
+          ? [AGENT_ROLE, agentName, agentPhone, now, user.id]
+          : [agentName, agentPhone, now, user.id])
+      );
 
     // Verify the update was successful
     if (updateResult.changes === 0) {
@@ -128,18 +189,22 @@ export async function POST(request: Request) {
       );
     }
 
-    console.log("Agent role assigned successfully", {
+    console.log("Agent updated successfully", {
       userId: user.id,
       email: user.email,
       previousRole: currentRole,
-      newRole: AGENT_ROLE,
+      newRole: shouldUpdateRole ? AGENT_ROLE : currentRole,
     });
 
     return NextResponse.json({
-      message: `${user.email} is now an agent`,
+      message: shouldUpdateRole
+        ? `${user.email} is now an agent`
+        : `${user.email} agent details updated`,
       agent: {
         ...user,
-        role: AGENT_ROLE,
+        name: agentName,
+        phone: agentPhone,
+        role: shouldUpdateRole ? AGENT_ROLE : currentRole,
       },
     });
   } catch (error) {

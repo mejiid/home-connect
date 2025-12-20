@@ -17,59 +17,64 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
   title,
   description,
 }) => (
-  <div className="bg-white p-8 rounded-xl shadow-lg hover:shadow-2xl transition-shadow duration-300 transform hover:-translate-y-2">
-    <div className="mb-6 inline-block p-4 rounded-full bg-harar-blue/10 text-harar-blue">
+  <div className="group relative overflow-hidden rounded-2xl border border-white/40 bg-white/85 p-7 shadow-sm backdrop-blur-sm transition hover:-translate-y-1 hover:shadow-xl">
+    <div className="mb-5 inline-flex items-center justify-center rounded-2xl bg-harar-blue/10 p-4 text-harar-blue">
       {icon}
     </div>
-    <h3 className="text-xl font-sora font-semibold mb-3 text-harar-dark">
+    <h3 className="text-lg font-sora font-semibold text-harar-dark sm:text-xl">
       {title}
     </h3>
-    <p className="text-gray-600 leading-relaxed">
+    <p className="mt-2 text-sm leading-relaxed text-zinc-600 sm:text-base">
       {description}
     </p>
+    <div className="pointer-events-none absolute -right-16 -top-16 h-36 w-36 rounded-full bg-harar-blue/10 blur-2xl transition group-hover:bg-harar-blue/15" />
   </div>
 );
 
 const Features: React.FC = () => {
   const features = [
     {
-      icon: <ToolboxIcon className="h-8 w-8" />,
-      title: "Local Services",
+      icon: <MarketplaceIcon className="h-8 w-8" />,
+      title: "Browse listings",
       description:
-        "Find trusted plumbers, electricians, and artisans right in your neighborhood. Verified and reviewed by the community.",
+        "Explore available homes for rent and sale with clear pricing, photos, and essential details.",
+    },
+    {
+      icon: <ToolboxIcon className="h-8 w-8" />,
+      title: "Smart filtering",
+      description:
+        "Narrow down options by property type and budget to find the right match faster.",
     },
     {
       icon: <CommunityIcon className="h-8 w-8" />,
-      title: "Community Hub",
+      title: "Connect with agents",
       description:
-        "Stay updated on local events, share news, and connect with your neighbors in a safe and friendly online space.",
-    },
-    {
-      icon: <MarketplaceIcon className="h-8 w-8" />,
-      title: "Harar Marketplace",
-      description:
-        "Buy and sell goods, from handmade crafts to fresh produce, within the trusted community of Harar.",
+        "Contact verified agents to schedule visits, ask questions, and get guidance through the process.",
     },
     {
       icon: <CultureIcon className="h-8 w-8" />,
-      title: "Cultural Guide",
+      title: "Local insights",
       description:
-        "Discover the rich history, hidden gems, and cultural etiquette of the Jugol, the ancient walled city.",
+        "Understand neighborhoods with location details and key amenities to choose with confidence.",
     },
   ];
 
   return (
     <section id="services" className="py-20 bg-harar-stone">
       <div className="container mx-auto px-6">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-sora font-bold text-harar-dark">
-            Everything You Need, All in One Place
+        <div className="mx-auto mb-12 max-w-3xl text-center">
+          <p className="mb-3 text-sm font-semibold tracking-wide text-harar-blue">
+            Why HomeConnect
+          </p>
+          <h2 className="text-3xl font-sora font-bold text-harar-dark md:text-4xl">
+            Modern real estate, built for Harar
           </h2>
-          <p className="text-lg text-gray-600 mt-4 max-w-2xl mx-auto">
-            A platform built for the people of Harar, by the people of Harar.
+          <p className="mt-4 text-base text-zinc-600 md:text-lg">
+            Find, filter, and connect—everything you need to move from browsing
+            to booking in one place.
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           {features.map((feature, index) => (
             <FeatureCard key={index} {...feature} />
           ))}

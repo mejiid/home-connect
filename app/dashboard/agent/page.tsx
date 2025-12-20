@@ -40,6 +40,7 @@ type Submission = {
   identityDocumentUrl: string;
   homeMapUrl: string;
   status: "pending" | "accepted" | "rejected";
+  statusUpdatedByName?: string | null;
   statusUpdatedByEmail?: string | null;
   statusUpdatedAt?: string | null;
   createdAt?: string;
@@ -208,6 +209,7 @@ const AgentDashboardPage = () => {
           setSelectedSubmission({
             ...selectedSubmission,
             status: newStatus,
+            statusUpdatedByName: session?.user?.name ?? selectedSubmission.statusUpdatedByName,
             statusUpdatedByEmail: session?.user?.email ?? selectedSubmission.statusUpdatedByEmail,
             statusUpdatedAt: new Date().toISOString(),
           });
@@ -220,20 +222,25 @@ const AgentDashboardPage = () => {
     }
   };
 
-  const getStatusBadge = (status: string, statusUpdatedByEmail?: string | null) => {
+  const getStatusBadge = (
+    status: string,
+    statusUpdatedByName?: string | null,
+    statusUpdatedByEmail?: string | null
+  ) => {
+    const reviewerLabel = (statusUpdatedByName ?? statusUpdatedByEmail ?? "").trim();
     switch (status) {
       case "accepted":
         return (
           <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
             <CheckCircle2 className="h-3 w-3 mr-1" />
-            {statusUpdatedByEmail ? `Accepted by ${statusUpdatedByEmail}` : "Accepted"}
+            {reviewerLabel ? `Accepted by ${reviewerLabel}` : "Accepted"}
           </span>
         );
       case "rejected":
         return (
           <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
             <XCircle className="h-3 w-3 mr-1" />
-            {statusUpdatedByEmail ? `Rejected by ${statusUpdatedByEmail}` : "Rejected"}
+            {reviewerLabel ? `Rejected by ${reviewerLabel}` : "Rejected"}
           </span>
         );
       default:
@@ -389,7 +396,11 @@ const AgentDashboardPage = () => {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="font-medium text-sm">{submission.fullName}</span>
-                                {getStatusBadge(submission.status, submission.statusUpdatedByEmail)}
+                                {getStatusBadge(
+                                  submission.status,
+                                  submission.statusUpdatedByName,
+                                  submission.statusUpdatedByEmail
+                                )}
                               </div>
                               <p className="text-xs text-zinc-600">
                                 {submission.email} • {submission.woreda}, {submission.kebele}
@@ -462,7 +473,11 @@ const AgentDashboardPage = () => {
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <span className="font-medium text-sm">{submission.fullName}</span>
-                                {getStatusBadge(submission.status, submission.statusUpdatedByEmail)}
+                                {getStatusBadge(
+                                  submission.status,
+                                  submission.statusUpdatedByName,
+                                  submission.statusUpdatedByEmail
+                                )}
                               </div>
                               <p className="text-xs text-zinc-600">
                                 {submission.email} • {submission.woreda}, {submission.kebele}
@@ -656,7 +671,11 @@ const AgentDashboardPage = () => {
                 <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
                   {selectedSubmission.type === "sell" ? "Sell" : "Lessor"}
                 </span>
-                {getStatusBadge(selectedSubmission.status, selectedSubmission.statusUpdatedByEmail)}
+                {getStatusBadge(
+                  selectedSubmission.status,
+                  selectedSubmission.statusUpdatedByName,
+                  selectedSubmission.statusUpdatedByEmail
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">

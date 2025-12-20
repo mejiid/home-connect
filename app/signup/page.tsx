@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Mail, Lock, Eye, EyeOff, Loader2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,15 @@ const RESEND_SECONDS = 45;
 const OTP_LENGTH = 6;
 
 export default function SignUpPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignUpInner />
+    </Suspense>
+  );
+}
+
+function SignUpInner() {
+  const searchParams = useSearchParams();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -72,6 +82,21 @@ export default function SignUpPage() {
   >(null);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [otpExpiresAt, setOtpExpiresAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    const notice = searchParams.get("notice")?.trim();
+
+    if (!notice) {
+      return;
+    }
+
+    // Only set the notice on the signup form step.
+    if (step !== "form") {
+      return;
+    }
+
+    setGeneralMessage((prev) => prev || notice);
+  }, [searchParams, step]);
 
   useEffect(() => {
     if (!resendCooldown) {
@@ -374,6 +399,11 @@ export default function SignUpPage() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {generalMessage && (
+                    <div className="rounded-lg border border-blue-200 bg-blue-50/80 px-4 py-3 text-sm text-blue-700">
+                      {generalMessage}
+                    </div>
+                  )}
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <div className="relative">

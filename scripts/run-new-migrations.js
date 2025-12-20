@@ -22,6 +22,12 @@ const migration3File = path.join(
   "../better-auth_migrations/2025-12-19T00-00-00.000Z.sql"
 );
 
+// Migration 4: Add phone to user table
+const migration4File = path.join(
+  __dirname,
+  "../better-auth_migrations/2025-12-19T12-00-00.000Z.sql"
+);
+
 try {
   // Check if status column exists
   const columns = db
@@ -79,6 +85,17 @@ try {
     );
   } else {
     console.log("✓ Migration 3: status audit columns already exist");
+  }
+
+  // Check if phone column exists on user
+  const userColumns = db.prepare("PRAGMA table_info(user)").all();
+  const hasPhone = userColumns.some((col) => col.name === "phone");
+  if (!hasPhone) {
+    const migration4SQL = fs.readFileSync(migration4File, "utf-8");
+    db.exec(migration4SQL);
+    console.log("✓ Migration 4 executed: Added phone column to user table");
+  } else {
+    console.log("✓ Migration 4: phone column already exists");
   }
 } catch (error) {
   console.error("Migration failed:", error);

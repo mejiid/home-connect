@@ -31,6 +31,7 @@ export async function GET(request: Request) {
          s.status, s."createdAt", s."updatedAt",
          s."statusUpdatedByUserId", s."statusUpdatedAt",
          u.email, u.name as "userName",
+         reviewer.name as "statusUpdatedByName",
          reviewer.email as "statusUpdatedByEmail"
          FROM "sell_submission" s
          JOIN "user" u ON s."userId" = u.id
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
       statusUpdatedAt?: string | null;
       email: string;
       userName: string | null;
+      statusUpdatedByName?: string | null;
       statusUpdatedByEmail?: string | null;
     }>;
 
@@ -65,6 +67,7 @@ export async function GET(request: Request) {
          s.status, s."createdAt", s."updatedAt",
          s."statusUpdatedByUserId", s."statusUpdatedAt",
          u.email, u.name as "userName",
+         reviewer.name as "statusUpdatedByName",
          reviewer.email as "statusUpdatedByEmail"
          FROM "lessor_submission" s
          JOIN "user" u ON s."userId" = u.id
@@ -88,6 +91,7 @@ export async function GET(request: Request) {
       statusUpdatedAt?: string | null;
       email: string;
       userName: string | null;
+      statusUpdatedByName?: string | null;
       statusUpdatedByEmail?: string | null;
     }>;
 

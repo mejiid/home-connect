@@ -5,8 +5,6 @@ import {
   MapPin,
   Share,
   Heart,
-  Phone,
-  Mail,
   Check,
   Home,
   BedDouble,
@@ -15,7 +13,7 @@ import {
 } from "lucide-react";
 import db from "@/lib/db";
 import { Property } from "@/types";
-import { Button } from "@/components/ui/button";
+import ContactAgent, { AgentInfo } from "@/components/contact-agent";
 
 interface PropertyPageProps {
   params: Promise<{
@@ -43,6 +41,24 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
     currency: property.currency,
     maximumFractionDigits: 0,
   }).format(property.price);
+
+  const userHasPhoneColumn = () => {
+    const columns = db.prepare('PRAGMA table_info("user")').all() as Array<{
+      name: string;
+    }>;
+    return columns.some((column) => column.name === "phone");
+  };
+
+  const includeAgentPhone = userHasPhoneColumn();
+  const agent = property.agentId
+    ? ((db
+        .prepare(
+          includeAgentPhone
+            ? 'SELECT id, name, email, phone FROM "user" WHERE id = ?'
+            : 'SELECT id, name, email FROM "user" WHERE id = ?'
+        )
+        .get(property.agentId) as AgentInfo | undefined) ?? null)
+    : null;
 
   return (
     <div className="min-h-screen bg-white">
@@ -231,12 +247,6 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
               <div className="space-y-4 mb-6">
                 <div className="border border-zinc-200 rounded-lg p-3">
-                  <div className="text-xs font-bold text-zinc-800 uppercase mb-1">Listing</div>
-                  <div className="text-zinc-600">
-                    {listingType === "rent" ? "For Rent" : listingType === "sell" ? "For Sale" : ""}
-                  </div>
-                </div>
-                <div className="border border-zinc-200 rounded-lg p-3">
                   <div className="text-xs font-bold text-zinc-800 uppercase mb-1">Status</div>
                   <div className="text-zinc-600">{property.status}</div>
                 </div>
@@ -246,22 +256,7 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
                 </div>
               </div>
 
-              <Button className="w-full bg-linear-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white font-semibold text-lg py-6 mb-4">
-                Contact Owner
-              </Button>
-
-              <div className="flex justify-between text-zinc-500 text-sm">
-                <div className="flex items-center gap-2">
-                  <Phone className="w-4 h-4" />
-                  <span>{property.ownerPhone}</span>
-                </div>
-                {property.ownerEmail && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4" />
-                    <span>Email available</span>
-                  </div>
-                )}
-              </div>
+              <ContactAgent agent={agent} />
             </div>
           </div>
         </div>

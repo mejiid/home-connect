@@ -41,6 +41,7 @@ export async function GET(request: Request) {
         `SELECT s.id, s."fullName", s."phoneNumber", s.woreda, s.kebele, s.village, 
          s."identityDocumentUrl", s."homeMapUrl", s.status, s."createdAt", s."updatedAt",
          s."statusUpdatedByUserId", s."statusUpdatedAt",
+         reviewer.name as "statusUpdatedByName",
          reviewer.email as "statusUpdatedByEmail"
          FROM "sell_submission" s
          LEFT JOIN "user" reviewer ON reviewer.id = s."statusUpdatedByUserId"
@@ -61,6 +62,7 @@ export async function GET(request: Request) {
       updatedAt: string;
       statusUpdatedByUserId?: string | null;
       statusUpdatedAt?: string | null;
+      statusUpdatedByName?: string | null;
       statusUpdatedByEmail?: string | null;
     }>;
 
@@ -70,6 +72,7 @@ export async function GET(request: Request) {
         `SELECT s.id, s."fullName", s."phoneNumber", s.woreda, s.kebele, s.village, 
          s."identityDocumentUrl", s."homeMapUrl", s.status, s."createdAt", s."updatedAt",
          s."statusUpdatedByUserId", s."statusUpdatedAt",
+         reviewer.name as "statusUpdatedByName",
          reviewer.email as "statusUpdatedByEmail"
          FROM "lessor_submission" s
          LEFT JOIN "user" reviewer ON reviewer.id = s."statusUpdatedByUserId"
@@ -90,6 +93,7 @@ export async function GET(request: Request) {
       updatedAt: string;
       statusUpdatedByUserId?: string | null;
       statusUpdatedAt?: string | null;
+      statusUpdatedByName?: string | null;
       statusUpdatedByEmail?: string | null;
     }>;
 

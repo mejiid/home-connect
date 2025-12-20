@@ -16,6 +16,7 @@ type Agent = {
   id: string;
   email: string;
   name?: string | null;
+  phone?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -32,6 +33,7 @@ type Submission = {
   identityDocumentUrl: string;
   homeMapUrl: string;
   status: "pending" | "accepted" | "rejected";
+  statusUpdatedByName?: string | null;
   statusUpdatedByEmail?: string | null;
   statusUpdatedAt?: string | null;
   createdAt: string;
@@ -60,6 +62,8 @@ const AdminDashboardPage = () => {
   const [assignLoading, setAssignLoading] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [formEmail, setFormEmail] = useState("");
+  const [formAgentName, setFormAgentName] = useState("");
+  const [formAgentPhone, setFormAgentPhone] = useState("");
   const [feedback, setFeedback] = useState<{
     type: "error" | "success";
     message: string;
@@ -211,10 +215,28 @@ const AdminDashboardPage = () => {
     event.preventDefault();
 
     const email = formEmail.trim();
+    const agentName = formAgentName.trim();
+    const agentPhone = formAgentPhone.trim();
     if (!email) {
       setFeedback({
         type: "error",
         message: "Please provide an email address.",
+      });
+      return;
+    }
+
+    if (!agentName) {
+      setFeedback({
+        type: "error",
+        message: "Agent name is required.",
+      });
+      return;
+    }
+
+    if (!agentPhone) {
+      setFeedback({
+        type: "error",
+        message: "Agent phone number is required.",
       });
       return;
     }
@@ -229,6 +251,15 @@ const AdminDashboardPage = () => {
       return;
     }
 
+    const phoneDigits = agentPhone.replace(/\D/g, "");
+    if (phoneDigits.length < 7) {
+      setFeedback({
+        type: "error",
+        message: "Please provide a valid phone number.",
+      });
+      return;
+    }
+
     setAssignLoading(true);
     setFeedback(null);
 
@@ -237,7 +268,7 @@ const AdminDashboardPage = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, name: agentName, phone: agentPhone }),
       });
 
       const data = (await response.json()) as {
@@ -270,6 +301,8 @@ const AdminDashboardPage = () => {
         message: data.message ?? "Agent role assigned successfully.",
       });
       setFormEmail("");
+      setFormAgentName("");
+      setFormAgentPhone("");
       fetchAgents();
     } catch (error) {
       const message =
@@ -337,6 +370,7 @@ const AdminDashboardPage = () => {
           setSelectedSubmission({
             ...selectedSubmission,
             status: newStatus,
+            statusUpdatedByName: session?.user?.name ?? selectedSubmission.statusUpdatedByName,
             statusUpdatedByEmail: session?.user?.email ?? selectedSubmission.statusUpdatedByEmail,
             statusUpdatedAt: new Date().toISOString(),
           });
@@ -349,20 +383,25 @@ const AdminDashboardPage = () => {
     }
   };
 
-  const getStatusBadge = (status: string, statusUpdatedByEmail?: string | null) => {
+  const getStatusBadge = (
+    status: string,
+    statusUpdatedByName?: string | null,
+    statusUpdatedByEmail?: string | null
+  ) => {
+    const reviewerLabel = (statusUpdatedByName ?? statusUpdatedByEmail ?? "").trim();
     switch (status) {
       case "accepted":
         return (
           <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
             <CheckCircle2 className="h-3 w-3 mr-1" />
-            {statusUpdatedByEmail ? `Accepted by ${statusUpdatedByEmail}` : "Accepted"}
+            {reviewerLabel ? `Accepted by ${reviewerLabel}` : "Accepted"}
           </span>
         );
       case "rejected":
         return (
           <span className="inline-flex items-center rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/20">
             <XCircle className="h-3 w-3 mr-1" />
-            {statusUpdatedByEmail ? `Rejected by ${statusUpdatedByEmail}` : "Rejected"}
+            {reviewerLabel ? `Rejected by ${reviewerLabel}` : "Rejected"}
           </span>
         );
       default:
@@ -481,20 +520,35 @@ const AdminDashboardPage = () => {
               <div className="rounded-lg border border-dashed border-zinc-200 bg-white/80 p-4">
                 <form
                   onSubmit={handleAssignAgent}
-                  className="flex flex-col gap-3 sm:flex-row"
+                  className="flex flex-col gap-3"
                 >
-                  <Input
-                    type="email"
-                    placeholder="agent@example.com"
-                    value={formEmail}
-                    onChange={(event) => setFormEmail(event.target.value)}
-                    required
-                    className="flex-1"
-                  />
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <Input
+                      type="email"
+                      placeholder="agent@example.com"
+                      value={formEmail}
+                      onChange={(event) => setFormEmail(event.target.value)}
+                      required
+                    />
+                    <Input
+                      type="text"
+                      placeholder="Agent name"
+                      value={formAgentName}
+                      onChange={(event) => setFormAgentName(event.target.value)}
+                      required
+                    />
+                    <Input
+                      type="tel"
+                      placeholder="Agent phone"
+                      value={formAgentPhone}
+                      onChange={(event) => setFormAgentPhone(event.target.value)}
+                      required
+                    />
+                  </div>
                   <Button
                     type="submit"
                     disabled={assignLoading}
-                    className="sm:w-auto"
+                    className="sm:w-fit"
                   >
                     {assignLoading ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -533,6 +587,11 @@ const AdminDashboardPage = () => {
                           {agent.name || agent.email}
                         </p>
                         <p className="text-xs text-zinc-500">{agent.email}</p>
+                        {agent.phone ? (
+                          <p className="text-xs text-zinc-500">
+                            {agent.phone}
+                          </p>
+                        ) : null}
                         <p className="mt-1 text-xs text-zinc-400">
                           Updated{" "}
                           {formatDate(agent.updatedAt || agent.createdAt)}
@@ -611,7 +670,11 @@ const AdminDashboardPage = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <span className="font-semibold">{submission.fullName}</span>
-                              {getStatusBadge(submission.status, submission.statusUpdatedByEmail)}
+                              {getStatusBadge(
+                                submission.status,
+                                submission.statusUpdatedByName,
+                                submission.statusUpdatedByEmail
+                              )}
                             </div>
                             <p className="text-sm text-zinc-600 mb-1">
                               {submission.email} • {submission.woreda}, {submission.kebele}, {submission.village}
@@ -691,7 +754,11 @@ const AdminDashboardPage = () => {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <span className="font-semibold">{submission.fullName}</span>
-                              {getStatusBadge(submission.status, submission.statusUpdatedByEmail)}
+                              {getStatusBadge(
+                                submission.status,
+                                submission.statusUpdatedByName,
+                                submission.statusUpdatedByEmail
+                              )}
                             </div>
                             <p className="text-sm text-zinc-600 mb-1">
                               {submission.email} • {submission.woreda}, {submission.kebele}, {submission.village}
@@ -763,7 +830,11 @@ const AdminDashboardPage = () => {
                   <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
                     {selectedSubmission.type === "sell" ? "Sell" : "Lessor"}
                   </span>
-                  {getStatusBadge(selectedSubmission.status, selectedSubmission.statusUpdatedByEmail)}
+                  {getStatusBadge(
+                    selectedSubmission.status,
+                    selectedSubmission.statusUpdatedByName,
+                    selectedSubmission.statusUpdatedByEmail
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
