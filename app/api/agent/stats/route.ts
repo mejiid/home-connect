@@ -17,8 +17,10 @@ export async function GET(request: Request) {
     }
 
     const listingsRow = db
-      .prepare('SELECT COUNT(*) as c FROM "properties" WHERE "agentId" = ?')
-      .get(session.userId) as { c: number };
+      .prepare(
+        'SELECT COUNT(*) as c FROM "properties" WHERE "agentId" = ? AND status = ?'
+      )
+      .get(session.userId, "Available") as { c: number };
 
     const sellClientsRow = db
       .prepare(

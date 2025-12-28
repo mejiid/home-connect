@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/card";
 import { authClient } from "@/lib/client";
 import { FilePreviewModal } from "@/components/file-preview-modal";
+import type { Property } from "@/types";
 
 type Submission = {
   id: string;
@@ -64,6 +65,10 @@ const AgentDashboardPage = () => {
   const [submissionsLoading, setSubmissionsLoading] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<Submission | null>(null);
   const [updatingStatus, setUpdatingStatus] = useState<string | null>(null);
+
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [propertiesLoading, setPropertiesLoading] = useState(false);
+  const [updatingPropertyId, setUpdatingPropertyId] = useState<string | null>(null);
   
   // Preview Modal State
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -101,6 +106,57 @@ const AgentDashboardPage = () => {
       console.error("Failed to fetch agent stats:", error);
     } finally {
       setStatsLoading(false);
+    }
+  };
+
+  const fetchProperties = async () => {
+    setPropertiesLoading(true);
+    try {
+      const response = await fetch("/api/agent/properties", {
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        setProperties([]);
+        return;
+      }
+
+      const data = (await response.json()) as { properties?: Property[] };
+      setProperties(Array.isArray(data.properties) ? data.properties : []);
+    } catch (error) {
+      console.error("Failed to fetch agent properties:", error);
+      setProperties([]);
+    } finally {
+      setPropertiesLoading(false);
+    }
+  };
+
+  const handlePropertyStatusUpdate = async (
+    id: string,
+    status: "Sold" | "Leased"
+  ) => {
+    setUpdatingPropertyId(id);
+    try {
+      const response = await fetch(`/api/properties/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status }),
+      });
+
+      if (!response.ok) {
+        return;
+      }
+
+      // Remove from local list immediately (since only Available are shown)
+      setProperties((current) => current.filter((p) => p.id !== id));
+      await fetchStats();
+      await fetchProperties();
+    } catch (error) {
+      console.error("Failed to update property status:", error);
+    } finally {
+      setUpdatingPropertyId(null);
     }
   };
 
@@ -154,6 +210,7 @@ const AgentDashboardPage = () => {
 
         fetchSubmissions();
         fetchStats();
+        fetchProperties();
       } catch (error) {
         console.error("Failed to resolve role", error);
         if (isMounted) {
@@ -359,6 +416,88 @@ const AgentDashboardPage = () => {
               </Card>
             </motion.div>
           </div>
+
+          {/* My Active Listings */}
+          <Card className="border-zinc-200/60 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Home className="w-5 h-5 text-blue-600" />
+                My Active Listings
+              </CardTitle>
+              <CardDescription>
+                Mark a home Sold or Leased to remove it from listings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {propertiesLoading ? (
+                <div className="flex items-center justify-center p-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-zinc-600" />
+                </div>
+              ) : properties.length === 0 ? (
+                <p className="text-center text-zinc-500 py-4 text-sm">
+                  No active listings
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {properties.map((property) => (
+                    <div
+                      key={property.id}
+                      className="border border-zinc-200 rounded-lg p-3 hover:shadow-md transition-shadow"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-sm truncate">
+                              {property.title}
+                            </span>
+                            <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-600/20">
+                              {property.listingType === "rent" ? "Rent" : property.listingType === "sell" ? "Sell" : "Listing"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-600">
+                            {property.city} • {property.type} • {new Intl.NumberFormat("en-ET", { style: "currency", currency: property.currency }).format(property.price)}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            asChild
+                          >
+                            <Link href={`/properties/${property.id}`}>View</Link>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePropertyStatusUpdate(property.id, "Sold")}
+                            disabled={updatingPropertyId === property.id}
+                          >
+                            {updatingPropertyId === property.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              "Mark Sold"
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handlePropertyStatusUpdate(property.id, "Leased")}
+                            disabled={updatingPropertyId === property.id}
+                          >
+                            {updatingPropertyId === property.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              "Mark Leased"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Submissions Section */}
           <Card className="border-zinc-200/60 shadow-lg">
